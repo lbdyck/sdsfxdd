@@ -1,3 +1,5 @@
+SDSFXDD - SDSF Extract Data from the JES SPOOL to z/OS Datasets
+
 Installation
 1. Copy the SDSFXDD into a REXX (or CLIST) library that will be
    available to your intended audientce.
