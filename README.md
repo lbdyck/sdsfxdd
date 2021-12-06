@@ -37,7 +37,7 @@ the z/OS limit of 44 characters.
  1. The generated dataset name must never exceed the z/OS limit of 44 characters. This may require having a small QUAL and no SUF.
  2. The generated dataset name will have a format of: hlq.qual.Dyyddd.Thhdd.stepname.ddname.suffix
  3. If the Step is within a PROC the PROC stepname is ignored
- 4. If all jobs or all steps are processed there is a potential of duplicate stepname and ddname combinations. When this happens the dataset name will be suffixed with a .A up to .B. This suffix will increment and is NOT dependent upon the ddname.
+ 4. If all jobs or all steps are processed there is a potential of duplicate stepname and ddname combinations. When this happens the dataset name will be suffixed with a .A up to .B. This suffix will increment withn the duplicate stepname and ddname.
 
  ## Disclaimer
 

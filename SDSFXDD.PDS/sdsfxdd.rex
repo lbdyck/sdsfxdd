@@ -1,5 +1,6 @@
-  /* --------------------  rexx procedure  -------------------- *
-  | Name:      sdsfxdd                                         |
+  /* --------------------  rexx procedure  -------------------- */
+  ver = '0.9'
+  /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
   |            to z/OS datasets.                               |
@@ -44,13 +45,14 @@
   |        If a duplicate dataset is generated due to proc and |
   |        procstep, then the dataset name will be suffixed    |
   |        with a .A, .B, etc. The extension is for uniqueness |
-  |        and increments with each duplicate.                 |
+  |        and increments within each duplicate ddname.        |
   |                                                            |
   | Dependencies:  Address SDSF support is required            |
   |                                                            |
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v0.9    2021/12/06 LBD - Add version and improve dups   |
   |            2021/12/05 LBD - Add checking and help          |
   |            2021/12/04 LBD - Major refinement               |
   |            2021/12/03 LBD - Major update w/keywords        |
@@ -63,10 +65,12 @@
   * ---------------------------------------------------------- */
   arg options
 
+ say 'SDSFXDD Version:' ver date() time()
+
   /* --------------- *
   | Define defaults |
   * --------------- */
-  parse value '' with null
+  parse value '' with null duplicates
   ddn = 'sd'time('s')
 
   /* ---------------------- *
@@ -186,7 +190,7 @@
 
         if sysdsn(outdsn) = 'OK' then do
           parse value outdsn with "'"outdsn"'"
-          ext = get_ext()
+          ext = get_ext(outdsn)
           outdsn = "'"outdsn'.'ext"'"
         end
 
@@ -258,8 +262,15 @@ done:
   if list = 'RETURN' then exit sdsfdsn
   exit 0
 
-Get_Ext: Procedure expose ext
-  str = 'ABCDEFGHIJKLMNOPQRSTUVWXYZA'
+Get_Ext: Procedure expose ext duplicates
+  arg dsn
+  dsn = translate(dsn,' ','.')
+  ext = word(dsn,words(dsn))
+  if wordpos(dsn,duplicates) = 0 then do
+     duplicates = duplicates dsn
+     return 'A'
+     end
+  str = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ$'
   p = pos(ext,str)
   if p = 0 then ext = 'A'
   else ext = substr(str,p+1,1)
