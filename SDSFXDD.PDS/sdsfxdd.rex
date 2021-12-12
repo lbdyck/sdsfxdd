@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.9'
+  ver = '0.91'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -11,7 +11,8 @@
   |               QUAL(qualifier) +                            |
   |               SUF(suffix) +                                |
   |               LIST(list) +                                 |
-  |               SYS(sys)                                     |
+  |               SYS(sys) +                                   |
+  |               DATE(date)                                   |
   |                                                            |
   |            jobname(jobid) is jobname(jobnnnnn)             |
   |                           or jobname                       |
@@ -28,6 +29,8 @@
   |               - default is YES                             |
   |            sys Yes to include or No to exclude these DD's  |
   |              JESMSGLG, JESYSMSG and JESJCL                 |
+  |            date - default to use date/time in dsname or    |
+  |                   any character for jobid (e.g. JOBnnnnn)  |
   |                                                            |
   |            *** Qual may be no more than 8 characters       |
   |                and must conform to z/OS dataset naming     |
@@ -37,6 +40,8 @@
   |                                                            |
   |  The output datasets will have this prefix:                |
   |  hlq'.'qual'.D'jul_date'.T'dsn_time'.'step'.'dd'.'suffix   |
+  |  or                                                        |
+  |  hlq'.'qual'.'jobid'.T'dsn_time'.'step'.'dd'.'suffix       |
   |                                                            |
   | Notes: Because of the limitation of 44 characters for a    |
   |        dataset name it is IMPORTANT that the QUAL and SUF  |
@@ -52,6 +57,7 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v0.91   2021/12/09 LBD - Add DATE keyword               |
   |    v0.9    2021/12/06 LBD - Add version and improve dups   |
   |            2021/12/05 LBD - Add checking and help          |
   |            2021/12/04 LBD - Major refinement               |
@@ -65,7 +71,7 @@
   * ---------------------------------------------------------- */
   arg options
 
- say 'SDSFXDD Version:' ver date() time()
+  say 'SDSFXDD Version:' ver date() time()
 
   /* --------------- *
   | Define defaults |
@@ -87,6 +93,7 @@
     'SUF('suffix')' 1 ,
     'QUAL('qual')' 1 ,
     'LIST('list')' . 1,
+    'DATE('dopt')' . 1,
     'SYS('sys')' .
 
   if qual = null then qual = 'X'
@@ -120,6 +127,7 @@
   say 'qualifier:' qual
   say 'suffix:   ' suffix
   say 'list:     ' list
+  say 'date:     ' dopt
   say 'sys:      ' sys
 
   if sys = 'NO' then sys = null
@@ -136,17 +144,6 @@
   | check for current jobname |
   * ------------------------- */
   if jobname = '*' then jobname = get_jobid()
-
-  /* ----------------------------------- *
-  | Construct the output dataset prefix |
-  * ----------------------------------- */
-  if sysvar('syspref') /= null
-  then sdsfdsn = sysvar('syspref')
-  else sdsfdsn = sysvar('sysuid')
-  dsn_time = time('n')
-  dsn_time = left(dsn_time,2)''substr(dsn_time,4,2)
-  dsn_date = date('j')
-  sdsfdsn = sdsfdsn'.'qual'.D'dsn_date'.T'dsn_time
 
   /* ----------------------------------- *
   | Separate the jobid from the jobname |
@@ -178,6 +175,7 @@
     if JOBID.ix = jobid then doit = 1
     if doit = 1 then do
       Address SDSF "ISFACT ST TOKEN('"TOKEN.ix"') PARM(NP ?) (prefix j_"
+      call build_dsn_hlq
       do idd = 1 to j_ddname.0
         if sys = null then
         if wordpos(j_ddname.idd,'JESMSGLG JESYSMSG JESJCL') > 0 then iterate
@@ -247,7 +245,9 @@
   if sysvar('sysispf') = 'ACTIVE' then do
     Address ISPExec
     sdsfdsn = translate(sdsfdsn,' ','.')
-    sdsfdsn = translate(subword(sdsfdsn,1,2),'.',' ')'.D*'
+    if dopt = null
+        then sdsfdsn = translate(subword(sdsfdsn,1,2),'.',' ')'.D*'
+        else sdsfdsn = translate(subword(sdsfdsn,1,2),'.',' ')
     "LMDINIT LISTID(LISTID) LEVEL("sdsfdsn")"
     "LMDDISP LISTID("ListId") Confirm(Yes)",
       "View(Volume)"
@@ -267,9 +267,9 @@ Get_Ext: Procedure expose ext duplicates
   dsn = translate(dsn,' ','.')
   ext = word(dsn,words(dsn))
   if wordpos(dsn,duplicates) = 0 then do
-     duplicates = duplicates dsn
-     return 'A'
-     end
+    duplicates = duplicates dsn
+    return 'A'
+  end
   str = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ$'
   p = pos(ext,str)
   if p = 0 then ext = 'A'
@@ -343,8 +343,30 @@ Tutor:
   say indent2 'No - do not use LMDLIST even if under ISPF'
   say indent2 'Return - returns the generated HLQ for the extracted datasets'
   say indent2 'Default is Yes'
+  say indent 'DATE(blank or JOB)'
+  say indent2 'Default is use date and time in generated dataset name.'
+  say indent2 'or any character for JOBID (e.g. JOBnnnnn)'
   say ' '
   say indent  'Becareful the generated dataset name does not exceed 44'
   say indent   'characters as then it will be invalid.'
   say copies('-',72)
   exit 0
+
+Build_DSN_HLQ:
+  /* ----------------------------------- *
+  | Construct the output dataset prefix |
+  * ----------------------------------- */
+  if sysvar('syspref') /= null
+  then sdsfdsn = sysvar('syspref')
+  else sdsfdsn = sysvar('sysuid')
+  /* Suggest using job submission or start time */
+  if dopt = null then do
+  dsn_time = time('n')
+  dsn_date = date('j')
+  dsn_time = left(dsn_time,2)''substr(dsn_time,4,2)
+  sdsfdsn = sdsfdsn'.'qual'.D'dsn_date'.T'dsn_time
+  end
+  else do
+     sdsfdsn = sdsfdsn'.'jobid.ix
+     end
+  return
