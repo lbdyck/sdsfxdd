@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.91'
+  ver = '0.92'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -57,6 +57,7 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v0.92   2022/05/03 LBD - Corrections for Jxxx->JOBxxx   |
   |    v0.91   2021/12/09 LBD - Add DATE keyword               |
   |    v0.9    2021/12/06 LBD - Add version and improve dups   |
   |            2021/12/05 LBD - Add checking and help          |
@@ -149,6 +150,12 @@
   | Separate the jobid from the jobname |
   * ----------------------------------- */
   parse value jobname with jobname'('jobid')'
+  if left(jobid,3) /= 'JOB' then
+     if left(jobid,1) = 'J' then
+        jobid = 'JOB'substr(jobid,2)
+  if left(jobid,3) /= 'TSU' then
+     if left(jobid,1) = 'T' then
+        jobid = 'TSU'substr(jobid,2)
 
   /* --------------- *
   | Inform the user |

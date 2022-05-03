@@ -10,8 +10,8 @@ Sample JCL:
 //... JOB ...
 .. several steps ..
 //EXTRACT EXEC PGM=IKJEFT1B,DYNAMNBR=50
-//SYSEXEC DD DISP=SHR,DSN=SDSFEXT.RUNTIME.LIBRARY
+//SYSEXEC DD DISP=SHR,DSN=SDSFXDD.RUNTIME.LIBRARY
 //SYSPRINT DD SYSOUT=*
 //SYSIN DD *
- %sdsfext job(*) dd(*) sys(no) qual(ext) step(*) list(no)
+ %sdsfxdd job(*) dd(*) sys(no) qual(ext) step(*) list(no)
 /*
