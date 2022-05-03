@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.92'
+  ver = '0.93'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -57,6 +57,7 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v0.93   2022/05/03 LBD - Message is no jobs found       |
   |    v0.92   2022/05/03 LBD - Corrections for Jxxx->JOBxxx   |
   |    v0.91   2021/12/09 LBD - Add DATE keyword               |
   |    v0.9    2021/12/06 LBD - Add version and improve dups   |
@@ -171,7 +172,13 @@
   rc=isfcalls('ON')
   Address SDSF "ISFEXEC ST" jobname
   lrc=rc
-  if lrc<>0 then exit 20
+  if lrc<>0 then do
+     say 'SDSF Error encountered - rc:' lrc
+     exit 20
+     end
+
+  if jname.0 = 0 then do
+     say jname.0 'jobs found matching the provided jobname' jobname
 
   /* --------------------------------------- *
   | Loop thru jobs and find the one we want |
