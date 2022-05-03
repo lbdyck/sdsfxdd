@@ -150,12 +150,14 @@
   | Separate the jobid from the jobname |
   * ----------------------------------- */
   parse value jobname with jobname'('jobid')'
+  if length(jobid) < 8 then do
   if left(jobid,3) /= 'JOB' then
      if left(jobid,1) = 'J' then
         jobid = 'JOB'substr(jobid,2)
   if left(jobid,3) /= 'TSU' then
      if left(jobid,1) = 'T' then
         jobid = 'TSU'substr(jobid,2)
+  end
 
   /* --------------- *
   | Inform the user |
