@@ -69,8 +69,8 @@
   |            2021/09/20 LBD - Creation                       |
   |                                                            |
   * ---------------------------------------------------------- *
-  | Copyright (c) 2021 by Lionel B. Dyck under the MIT License |
-  | https://mit-license.org                                    |
+  | Copyright (c) 2021-2022 by Lionel B. Dyck under the MIT    |
+  | License https://mit-license.org                            |
   * ---------------------------------------------------------- */
   arg options
 
