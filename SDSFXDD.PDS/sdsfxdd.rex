@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.93'
+  ver = '0.94'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -57,6 +57,9 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v0.94   2022/05/04 LBD - Set two more defaults          |
+  |                           - Set isfdest to *               |
+  |                           - Set isfowner to *              |
   |    v0.93   2022/05/03 LBD - Message if no jobs found       |
   |                           - Set isfprefix to *             |
   |    v0.92   2022/05/03 LBD - Corrections for Jxxx->JOBxxx   |
@@ -69,8 +72,8 @@
   |            2021/09/20 LBD - Creation                       |
   |                                                            |
   * ---------------------------------------------------------- *
-  | Copyright (c) 2021-2022 by Lionel B. Dyck under the MIT    |
-  | License https://mit-license.org                            |
+  | Copyright (c) 2021 by Lionel B. Dyck under the MIT License |
+  | https://mit-license.org                                    |
   * ---------------------------------------------------------- */
   arg options
 
@@ -172,6 +175,8 @@
   * ----------------- */
   rc=isfcalls('ON')
   isfprefix = '*'
+  isfdest   = ''
+  isfowner  = ''
   Address SDSF "ISFEXEC ST" jobname
   lrc=rc
   if lrc<>0 then do
