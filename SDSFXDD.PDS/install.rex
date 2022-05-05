@@ -11,7 +11,7 @@ Sample JCL:
 .. several steps ..
 //EXTRACT EXEC PGM=IKJEFT1B,DYNAMNBR=50
 //SYSEXEC DD DISP=SHR,DSN=SDSFXDD.RUNTIME.LIBRARY
-//SYSPRINT DD SYSOUT=*
-//SYSIN DD *
+//SYSTSPRT DD SYSOUT=*
+//SYSTSIN DD *
  %sdsfxdd job(*) dd(*) sys(no) qual(ext) step(*) list(no)
 /*
