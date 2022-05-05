@@ -376,7 +376,7 @@ Tutor:
   say indent2 'Default is use date and time in generated dataset name.'
   say indent2 'or any character for JOBID (e.g. JOBnnnnn)'
   say ' '
-  say indent  'Becareful the generated dataset name does not exceed 44'
+  say indent  'Be careful the generated dataset name does not exceed 44'
   say indent   'characters as then it will be invalid.'
   say copies('-',72)
   exit 0
