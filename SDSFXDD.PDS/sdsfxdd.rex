@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.94'
+  ver = '0.95'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -57,6 +57,7 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v0.95   2022/05/05 LBD - Improved error messages        |
   |    v0.94   2022/05/04 LBD - Set two more defaults          |
   |                           - Set isfdest to *               |
   |                           - Set isfowner to *              |
@@ -181,7 +182,10 @@
   lrc=rc
   if lrc<>0 then do
      say 'SDSF Error encountered - rc:' lrc
-     exit 20
+     do i = 1 to isfmsg2.0
+        say isfmsg2.i
+        end
+     exit lrc
      end
 
   if jname.0 = 0 then do
