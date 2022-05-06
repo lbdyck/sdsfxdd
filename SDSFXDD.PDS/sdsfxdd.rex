@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.95'
+  ver = '0.96'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -57,6 +57,10 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v0.96   2022/05/06 LBD - Correct RECFM if not blocked   |
+  |                             to blocked. Change U to V also.|
+  |                           - Remove list(return) as not     |
+  |                             valid.                         |
   |    v0.95   2022/05/05 LBD - Improved error messages        |
   |    v0.94   2022/05/04 LBD - Set two more defaults          |
   |                           - Set isfdest to *               |
@@ -240,11 +244,19 @@
         blksize = (32760%j_lrecl.idd)*j_lrecl.idd
         space   = ((j_reccnt.idd*j_lrecl.idd)%56000)+1
 
+        recfm = left(j_recfm.idd,1) substr(j_recfm.idd,2,1) ,
+          substr(j_recfm.idd,3,1)
+
+        if left(recfm,1) /= 'U' then do
+        if substr(recfm,2,1) /= 'B' then
+           recfm = left(j_recfm.idd,1) 'B' substr(j_recfm.idd,3,1)
+           end
+        else recfm = 'V B' substr(j_recfm.idd,3,1)
+
         'Alloc f('ddn') new blksize('blksize') tracks' ,
           "ds("outdsn")" ,
           'space('space','space') lrecl('j_lrecl.idd')' ,
-          'release recfm('left(j_recfm.idd,1) substr(j_recfm.idd,2,1) ,
-          substr(j_recfm.idd,3,1)')'
+          'release recfm('recfm')'
 
         do forever
           'Execio 10000 diskr' isfddname.1 '(stem in.'
@@ -288,7 +300,6 @@
   * ------------------------ */
 done:
   rc=isfcalls('OFF')
-  if list = 'RETURN' then exit sdsfdsn
   exit 0
 
 Get_Ext: Procedure expose ext duplicates
@@ -367,16 +378,15 @@ Tutor:
   say indent 'SUF(suffix) or SUF(NONE)'
   say indent2 'The extracted sysout dataset name suffix or NONE'
   say indent2 'Must not exceed 7 characters'
-  say indent 'LIST(Yes, No, or Return)'
+  say indent 'LIST(Yes or No)'
   say indent2 'Yes - if under ISPF invoke LMDLIST for the extracted datasets'
   say indent2 'No - do not use LMDLIST even if under ISPF'
-  say indent2 'Return - returns the generated HLQ for the extracted datasets'
   say indent2 'Default is Yes'
   say indent 'DATE(blank or JOB)'
   say indent2 'Default is use date and time in generated dataset name.'
   say indent2 'or any character for JOBID (e.g. JOBnnnnn)'
   say ' '
-  say indent  'Be careful the generated dataset name does not exceed 44'
+  say indent  'Becareful the generated dataset name does not exceed 44'
   say indent   'characters as then it will be invalid.'
   say copies('-',72)
   exit 0
