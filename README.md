@@ -29,7 +29,7 @@ the z/OS limit of 44 characters.
  | DD | Specify the DDname to be processed <br /> ddname or * for all ddnames <br /> masking is not supported at this time |
  | QUAL | Specify the 2nd level qualifier for the generated dataset names <br /> the 1st qualifier will be the users USERID or PREFIX <br />  The **Default** is X|
  | SUF | Specify the ***optional*** dataset suffix for the generated datasets <br />The default is no suffix or you can specify SUF(NONE) <br /> The suffix is limited to 7 characters |
- | LIST | Defines what the code does when it completes <br /> YES if under ISPF to display a dataset list (ISPF 3.4) of the datasets <br /> NO (default) to just exit <br /> or RETURN to pass the generated dataset high level qualifier as the return code |
+ | LIST | Defines what the code does when it completes <br /> YES if under ISPF to display a dataset list (ISPF 3.4) of the datasets <br /> NO (default) to just exit |
  | SYS | Specify if the System generated files (JESMSGLG, JESYSMSG, and JESJCL) are to be included <br /> YES or NO |
 
  ## Notes:
