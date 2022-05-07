@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.96'
+  ver = '0.97'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -11,6 +11,7 @@
   |               QUAL(qualifier) +                            |
   |               SUF(suffix) +                                |
   |               LIST(list) +                                 |
+  |               OWNER(owner) +                               |
   |               SYS(sys) +                                   |
   |               DATE(date)                                   |
   |                                                            |
@@ -25,11 +26,13 @@
   |               level) - Default is X                        |
   |            suffix is the suffix to be used for the         |
   |               generated datasets or NONE (default)         |
+  |            owner to limit the jobs to those owned by the   |
+  |               specified userid (default is all)            |
   |            list is Yes for a dataset list or No or Return  |
   |               - default is YES                             |
   |            sys Yes to include or No to exclude these DD's  |
   |              JESMSGLG, JESYSMSG and JESJCL                 |
-  |            date - default to use date/time in dsname or    |
+  |            date - default to use job creation date/time    |
   |                   any character for jobid (e.g. JOBnnnnn)  |
   |                                                            |
   |            *** Qual may be no more than 8 characters       |
@@ -39,9 +42,9 @@
   |                and must conform to z/OS dataset naming     |
   |                                                            |
   |  The output datasets will have this prefix:                |
-  |  hlq'.'qual'.D'jul_date'.T'dsn_time'.'step'.'dd'.'suffix   |
+  |  hlq'.'qual'.D'yyddd'.T'hhmm'.'step'.'dd'.'suffix          |
   |  or                                                        |
-  |  hlq'.'qual'.'jobid'.T'dsn_time'.'step'.'dd'.'suffix       |
+  |  hlq'.'qual'.'jobid'.T'hhmm'.'step'.'dd'.'suffix           |
   |                                                            |
   | Notes: Because of the limitation of 44 characters for a    |
   |        dataset name it is IMPORTANT that the QUAL and SUF  |
@@ -57,6 +60,9 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v0.97   2022/05/07 LBD - Use Job date/time instead of   |
+  |                             current date/time              |
+  |                           - Support Owner(userid)          |
   |    v0.96   2022/05/06 LBD - Correct RECFM if not blocked   |
   |                             to blocked. Change U to V also.|
   |                           - Remove list(return) as not     |
@@ -77,7 +83,8 @@
   |            2021/09/20 LBD - Creation                       |
   |                                                            |
   * ---------------------------------------------------------- *
-  | Copyright (c) 2021 by Lionel B. Dyck under the MIT License |
+  | Copyright (c) 2021-2022 by Lionel B. Dyck under the MIT    |
+  | License                                                    |
   | https://mit-license.org                                    |
   * ---------------------------------------------------------- */
   arg options
@@ -101,9 +108,10 @@
   parse value options with 'JOB('jobname') ' . 1 ,
     'DD('ddname')' . 1 ,
     'STEP('stepname')' . 1 ,
-    'SUF('suffix')' 1 ,
-    'QUAL('qual')' 1 ,
+    'SUF('suffix')' . 1 ,
+    'QUAL('qual')' . 1 ,
     'LIST('list')' . 1,
+    'OWNER('owner')' . 1,
     'DATE('dopt')' . 1,
     'SYS('sys')' .
 
@@ -161,12 +169,12 @@
   * ----------------------------------- */
   parse value jobname with jobname'('jobid')'
   if length(jobid) < 8 then do
-  if left(jobid,3) /= 'JOB' then
-     if left(jobid,1) = 'J' then
-        jobid = 'JOB'substr(jobid,2)
-  if left(jobid,3) /= 'TSU' then
-     if left(jobid,1) = 'T' then
-        jobid = 'TSU'substr(jobid,2)
+    if left(jobid,3) /= 'JOB' then
+    if left(jobid,1) = 'J' then
+    jobid = 'JOB'substr(jobid,2)
+    if left(jobid,3) /= 'TSU' then
+    if left(jobid,1) = 'T' then
+    jobid = 'TSU'substr(jobid,2)
   end
 
   /* --------------- *
@@ -181,21 +189,23 @@
   rc=isfcalls('ON')
   isfprefix = '*'
   isfdest   = ''
-  isfowner  = ''
+  if owner = null
+     then isfowner  = ''
+     else isfowner  = owner
   Address SDSF "ISFEXEC ST" jobname
   lrc=rc
   if lrc<>0 then do
-     say 'SDSF Error encountered - rc:' lrc
-     do i = 1 to isfmsg2.0
-        say isfmsg2.i
-        end
-     exit lrc
-     end
+    say 'SDSF Error encountered - rc:' lrc
+    do i = 1 to isfmsg2.0
+      say isfmsg2.i
+    end
+    exit lrc
+  end
 
   if jname.0 = 0 then do
-     say jname.0 'jobs found matching the provided jobname' jobname
-     exit 0
-     end
+    say jname.0 'jobs found matching the provided jobname' jobname
+    exit 0
+  end
 
   /* --------------------------------------- *
   | Loop thru jobs and find the one we want |
@@ -248,9 +258,9 @@
           substr(j_recfm.idd,3,1)
 
         if left(recfm,1) /= 'U' then do
-        if substr(recfm,2,1) /= 'B' then
-           recfm = left(j_recfm.idd,1) 'B' substr(j_recfm.idd,3,1)
-           end
+          if substr(recfm,2,1) /= 'B' then
+          recfm = left(j_recfm.idd,1) 'B' substr(j_recfm.idd,3,1)
+        end
         else recfm = 'V B' substr(j_recfm.idd,3,1)
 
         'Alloc f('ddn') new blksize('blksize') tracks' ,
@@ -287,8 +297,8 @@
     Address ISPExec
     sdsfdsn = translate(sdsfdsn,' ','.')
     if dopt = null
-        then sdsfdsn = translate(subword(sdsfdsn,1,2),'.',' ')'.D*'
-        else sdsfdsn = translate(subword(sdsfdsn,1,2),'.',' ')
+    then sdsfdsn = translate(subword(sdsfdsn,1,2),'.',' ')'.D*'
+    else sdsfdsn = translate(subword(sdsfdsn,1,2),'.',' ')
     "LMDINIT LISTID(LISTID) LEVEL("sdsfdsn")"
     "LMDDISP LISTID("ListId") Confirm(Yes)",
       "View(Volume)"
@@ -365,26 +375,29 @@ Tutor:
   say indent 'DD(*) or DD(ddname)'
   say indent2 '* = all DDnames (subject to SYS setting)'
   say indent2 'ddname is a specific ddname'
-  say indent 'SYS(Yes or No)'
-  say indent2 'Yes to include the System Sysout (JESMSGLG, JESSYSMG, JESJCL)'
-  say indent2 'No to exclude them (Default)'
-  say indent 'STEP(*) or STEP(stepname)'
-  say indent2 '* = all steps'
-  say indent2 'Specific stepname'
-  say indent 'QUAL(qualifier)'
-  say indent2 'This is the 2nd level qualifier after the userid/prefix'
-  say indent2 'for the extracted sysout dataset names'
-  say indent2 'Default is X'
-  say indent 'SUF(suffix) or SUF(NONE)'
-  say indent2 'The extracted sysout dataset name suffix or NONE'
-  say indent2 'Must not exceed 7 characters'
+  say indent 'DATE(blank or JOB)'
+  say indent2 'Default is use date and time in generated dataset name.'
+  say indent2 'or any character for JOBID (e.g. JOBnnnnn)'
   say indent 'LIST(Yes or No)'
   say indent2 'Yes - if under ISPF invoke LMDLIST for the extracted datasets'
   say indent2 'No - do not use LMDLIST even if under ISPF'
   say indent2 'Default is Yes'
-  say indent 'DATE(blank or JOB)'
-  say indent2 'Default is use date and time in generated dataset name.'
-  say indent2 'or any character for JOBID (e.g. JOBnnnnn)'
+  say indent 'OWNER(blank or owning userid)'
+  say indent2 'Default is to set owner to blank for all users,'
+  say indent2 'or valid userid.'
+  say indent 'QUAL(qualifier)'
+  say indent2 'This is the 2nd level qualifier after the userid/prefix'
+  say indent2 'for the extracted sysout dataset names'
+  say indent2 'Default is X'
+  say indent 'STEP(*) or STEP(stepname)'
+  say indent2 '* = all steps'
+  say indent2 'Specific stepname'
+  say indent 'SUF(suffix) or SUF(NONE)'
+  say indent2 'The extracted sysout dataset name suffix or NONE'
+  say indent2 'Must not exceed 7 characters'
+  say indent 'SYS(Yes or No)'
+  say indent2 'Yes to include the System Sysout (JESMSGLG, JESSYSMG, JESJCL)'
+  say indent2 'No to exclude them (Default)'
   say ' '
   say indent  'Be careful the generated dataset name does not exceed 44'
   say indent   'characters as then it will be invalid.'
@@ -395,17 +408,19 @@ Build_DSN_HLQ:
   /* ----------------------------------- *
   | Construct the output dataset prefix |
   * ----------------------------------- */
+  parse value dater.ix with yy'.'ddd .
+  dsn_date = right(yy,2)''ddd
+  parse value timer.ix with hh':'mm':'.
+  if hh < 10 then hh = right(hh+100,2)
+  dsn_time = hh''mm
   if sysvar('syspref') /= null
   then sdsfdsn = sysvar('syspref')
   else sdsfdsn = sysvar('sysuid')
   /* Suggest using job submission or start time */
   if dopt = null then do
-  dsn_time = time('n')
-  dsn_date = date('j')
-  dsn_time = left(dsn_time,2)''substr(dsn_time,4,2)
-  sdsfdsn = sdsfdsn'.'qual'.D'dsn_date'.T'dsn_time
+    sdsfdsn = sdsfdsn'.'qual'.D'dsn_date'.T'dsn_time
   end
   else do
-     sdsfdsn = sdsfdsn'.'jobid.ix
-     end
+    sdsfdsn = sdsfdsn'.'jobid.ix
+  end
   return

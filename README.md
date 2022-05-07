@@ -17,8 +17,10 @@ the z/OS limit of 44 characters.
    STEP(stepname) +
    DD(ddname) +
    QUAL(qualifier) +
+   OWNER(owning-userid) +
    SUF(suffix) +
    LIST(list) +
+   DATE(date) +
    SYS(sys)
    ```
 
@@ -27,6 +29,8 @@ the z/OS limit of 44 characters.
  | JOB   | Specify the JOB name to be processed.   <br />  jobname(jobid) for a specific job <br />  or  jobname for all jobs with the same jobname <br />  or jobname* for all jobs starting with jobname |
  | STEP | Specify the Stepname to be processed <br /> stepname or * for all steps <br /> ***Note*** that PROC Step names are not considered at this time |
  | DD | Specify the DDname to be processed <br /> ddname or * for all ddnames <br /> masking is not supported at this time |
+ | OWNER | Specify the owning userid <br /> or default to ALL users |
+ | DATE | if non-blank then use JOBID <br> or default to job creation date and time |
  | QUAL | Specify the 2nd level qualifier for the generated dataset names <br /> the 1st qualifier will be the users USERID or PREFIX <br />  The **Default** is X|
  | SUF | Specify the ***optional*** dataset suffix for the generated datasets <br />The default is no suffix or you can specify SUF(NONE) <br /> The suffix is limited to 7 characters |
  | LIST | Defines what the code does when it completes <br /> YES if under ISPF to display a dataset list (ISPF 3.4) of the datasets <br /> NO (default) to just exit |
@@ -46,7 +50,7 @@ the z/OS limit of 44 characters.
  ## License
 
 The MIT License (MIT)
-Copyright © 2021 <copyright holders>
+Copyright © 2021-2022 <copyright holders>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the Software), to deal in the Software without restriction, including without
