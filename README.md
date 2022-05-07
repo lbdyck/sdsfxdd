@@ -16,12 +16,12 @@ the z/OS limit of 44 characters.
 %sdsfxdd JOB(jobname(jobid)) +
    STEP(stepname) +
    DD(ddname) +
-   QUAL(qualifier) +
    OWNER(owning-userid) +
+   QUAL(qualifier) +
    SUF(suffix) +
+   SYS(sys)
    LIST(list) +
    DATE(date) +
-   SYS(sys)
    ```
 
  | Keyword | Explanation |
