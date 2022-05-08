@@ -53,12 +53,19 @@ Keywords:
      hlq'.'qual'.'jobid'.T'hhmm'.'step'.'dd'.'suffix
 
    Notes: Because of the limitation of 44 characters for a
-           dataset name it is IMPORTANT that the QUAL and SUF
-           be minimal.
+          dataset name it is IMPORTANT that the QUAL and SUF
+          be minimal.
 
-           If a duplicate dataset is generated due to proc and
-           procstep, then the dataset name will be suffixed
-           with a .A, .B, etc. The extension is for uniqueness
-           and increments within each duplicate ddname.
+          If a duplicate dataset is generated due to proc and
+          procstep, then the dataset name will be suffixed
+          with a .A, .B, etc. The extension is for uniqueness
+          and increments within each duplicate ddname.
+
+          A 1 second start up delay in processing was added due
+          to a rare situation where the sdsf status returned no
+          jobs found if the steps prior are quick. Not sure why
+          this is happening but it was so the 1 second delay is
+          not incorporated.
+
 
    Dependencies:   Address SDSF support is required

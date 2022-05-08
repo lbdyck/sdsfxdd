@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.97'
+  ver = '0.98'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -60,6 +60,10 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v0.98   2022/05/08 LBD - Improve duplicate correction   |
+  |                           - add 1 second delay for JES     |
+  |                             to catch up (needed but not    |
+  |                             sure why)                      |
   |    v0.97   2022/05/07 LBD - Use Job date/time instead of   |
   |                             current date/time              |
   |                           - Support Owner(userid)          |
@@ -177,6 +181,11 @@
     jobid = 'TSU'substr(jobid,2)
   end
 
+  /* ------------------------------------------ *
+  | Wait for 1 second to allow JES to catch up |
+  * ------------------------------------------ */
+  address 'SYSCALL' 'SLEEP (1)'
+
   /* --------------- *
   | Inform the user |
   * --------------- */
@@ -190,8 +199,8 @@
   isfprefix = '*'
   isfdest   = ''
   if owner = null
-     then isfowner  = ''
-     else isfowner  = owner
+  then isfowner  = ''
+  else isfowner  = owner
   Address SDSF "ISFEXEC ST" jobname
   lrc=rc
   if lrc<>0 then do
@@ -229,10 +238,12 @@
 
         outdsn = "'"sdsfdsn'.'j_stepn.idd'.'j_ddname.idd''suf"'"
 
-        if sysdsn(outdsn) = 'OK' then do
-          parse value outdsn with "'"outdsn"'"
-          ext = get_ext(outdsn)
-          outdsn = "'"outdsn'.'ext"'"
+        do forever
+          if sysdsn(outdsn) = 'OK' then do
+            parse value outdsn with "'"outdsn"'"
+            ext = get_ext(outdsn)
+          end
+          else leave
         end
 
         if length(outdsn) > 46 then do
@@ -288,9 +299,9 @@
   if list /= 'YES' then call done
 
   /* ----------------------------------------------- *
-  | Check for running under the web and if not then |
-  | check for running under TSO and if so then      |
-  | display (3.4 like) the datasets generated.      |
+  | Check for running under TSO and if so then      |
+  | if under ISPF then display (3.4 like) the       |
+  | datasets generated.                             |
   * ----------------------------------------------- */
   if sysvar('sysenv') = 'FORE' then
   if sysvar('sysispf') = 'ACTIVE' then do
@@ -312,18 +323,18 @@ done:
   rc=isfcalls('OFF')
   exit 0
 
-Get_Ext: Procedure expose ext duplicates
+Get_Ext: Procedure expose ext duplicates outdsn
   arg dsn
   dsn = translate(dsn,' ','.')
   ext = word(dsn,words(dsn))
-  if wordpos(dsn,duplicates) = 0 then do
-    duplicates = duplicates dsn
-    return 'A'
-  end
+  if length(ext) = 1 then
+  dsn = subword(dsn,1,words(dsn)-1)
   str = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ$'
   p = pos(ext,str)
   if p = 0 then ext = 'A'
   else ext = substr(str,p+1,1)
+  dsn = translate(dsn,'.',' ')
+  outdsn = "'"dsn'.'ext"'"
   return ext
 
   /* ------------------------------------------ *
