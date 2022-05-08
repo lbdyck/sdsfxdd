@@ -1,19 +1,22 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.99'
+  ver = '1.00'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
   |            to z/OS datasets.                               |
   |                                                            |
-  | Syntax:    %sdsfxdd JOB(jobname(jobid)) +                  |
-  |               STEP(stepname) +                             |
-  |               DD(ddname) +                                 |
-  |               QUAL(qualifier) +                            |
-  |               SUF(suffix) +                                |
-  |               LIST(list) +                                 |
-  |               OWNER(owner) +                               |
-  |               SYS(sys) +                                   |
+  | Syntax:    %sdsfxdd JOBname(jobname(jobid)) +              |
+  |               STEPname(stepname) +                         |
+  |               DDname(ddname) +                             |
+  |               HLQ(high-level-qualifier) +                  |
+  |               QUALifier(qualifier) +                       |
+  |               SUFfix(suffix) +                             |
+  |               LISt(list) +                                 |
+  |               OWNer(owner) +                               |
+  |               SYStem(sys) +                                |
   |               DATE(date)                                   |
+  |                                                            |
+  |            Abbreviations in CAPs.                          |
   |                                                            |
   |            jobname(jobid) is jobname(jobnnnnn)             |
   |                           or jobname                       |
@@ -22,6 +25,9 @@
   |            stepname is the job step name (e.g. STEP1)      |
   |                           or * for all steps               |
   |            ddname is the ddname to extract (or * for all)  |
+  |            hlq is used as the high-level-qualifer for the  |
+  |                generated datasets                          |
+  |                ** the default is the userid or prefix      |
   |            qualifier is the 2nd level qualifier (single    |
   |               level) - Default is X                        |
   |            suffix is the suffix to be used for the         |
@@ -60,31 +66,9 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
-  |    v0.99   2022/05/08 LBD - Report on owner value          |
-  |    v0.98   2022/05/08 LBD - Improve duplicate correction   |
-  |                           - add 1 second delay for JES     |
-  |                             to catch up (needed but not    |
-  |                             sure why)                      |
-  |    v0.97   2022/05/07 LBD - Use Job date/time instead of   |
-  |                             current date/time              |
-  |                           - Support Owner(userid)          |
-  |    v0.96   2022/05/06 LBD - Correct RECFM if not blocked   |
-  |                             to blocked. Change U to V also.|
-  |                           - Remove list(return) as not     |
-  |                             valid.                         |
-  |    v0.95   2022/05/05 LBD - Improved error messages        |
-  |    v0.94   2022/05/04 LBD - Set two more defaults          |
-  |                           - Set isfdest to *               |
-  |                           - Set isfowner to *              |
-  |    v0.93   2022/05/03 LBD - Message if no jobs found       |
-  |                           - Set isfprefix to *             |
-  |    v0.92   2022/05/03 LBD - Corrections for Jxxx->JOBxxx   |
-  |    v0.91   2021/12/09 LBD - Add DATE keyword               |
-  |    v0.9    2021/12/06 LBD - Add version and improve dups   |
-  |            2021/12/05 LBD - Add checking and help          |
-  |            2021/12/04 LBD - Major refinement               |
-  |            2021/12/03 LBD - Major update w/keywords        |
-  |            2021/09/21 LBD - Refinement                     |
+  |    v1.00   2022/05/08 LBD - Release 1.00 ready             |
+  |                           - Thanks to Phil Smith III for   |
+  |                             options parsing and QA         |
   |            2021/09/20 LBD - Creation                       |
   |                                                            |
   * ---------------------------------------------------------- *
@@ -110,15 +94,33 @@
   /* -------------------------------- *
   | Determine which keywords we have |
   * -------------------------------- */
-  parse value options with 'JOB('jobname') ' . 1 ,
-    'DD('ddname')' . 1 ,
-    'STEP('stepname')' . 1 ,
-    'SUF('suffix')' . 1 ,
-    'QUAL('qual')' . 1 ,
-    'LIST('list')' . 1,
-    'OWNER('owner')' . 1,
-    'DATE('dopt')' . 1,
-    'SYS('sys')' .
+  parse value '' with ddname jobname stepname suffix qual list ,
+    owner dopt sys hlq
+  do while options <> ''
+    parse var options option '(' value ')' options
+    option = strip(option)
+    value = strip(value)
+    if pos('(',value) > 0 then do
+       value = value')'
+       parse value options with ')' options
+       end
+    select
+      when abbrev('DDNAME', option, 2)    then ddname   = value
+      when abbrev('JOBNAME', option, 3)   then jobname  = value
+      when abbrev('STEPNAME', option, 4)  then stepname = value
+      when abbrev('SUFFIX', option, 3)    then suffix   = value
+      when abbrev('HLQ', option, 3)       then hlq      = value
+      when abbrev('QUALIFIER', option, 4) then qual     = value
+      when abbrev('LIST', option, 3)      then list     = value
+      when abbrev('OWNER', option, 3)     then owner    = value
+      when abbrev('DATE', option, 4)      then dopt     = value
+      when abbrev('SYSTEM', option, 3)    then sys      = value
+      otherwise do
+        say 'Invalid option "'option'"'
+        exit 8
+      end
+    end
+  end
 
   if qual = null then qual = 'X'
   else if length(qual) > 8 then do
@@ -135,6 +137,12 @@
   if stepname = null then call tutor
   if ddname   = null then call tutor
 
+  if hlq = null then do
+    if sysvar('syspref') /= null
+    then hlq = sysvar('syspref')
+    else hlq = sysvar('sysuid')
+  end
+
   /* -------------------------------------------------------- *
   | Test suffix for less than 7 so that the generated dsname |
   | won't be more than 44 characters.                        |
@@ -148,6 +156,7 @@
   say 'jobname:  ' jobname
   say 'stepname: ' stepname
   say 'ddname:   ' ddname
+  say 'hlq:      ' hlq
   say 'qualifier:' qual
   say 'suffix:   ' suffix
   say 'owner:    ' owner
@@ -185,8 +194,10 @@
 
   /* ------------------------------------------ *
   | Wait for 1 second to allow JES to catch up |
+  | but only for the active job                |
   * ------------------------------------------ */
-  address 'SYSCALL' 'SLEEP (1)'
+  if job = '*' then
+     address 'SYSCALL' 'SLEEP (1)'
 
   /* --------------- *
   | Inform the user |
@@ -381,11 +392,11 @@ Tutor:
     'utilizing SDSF REXX.'
   say ' '
   say 'Syntax:'
-  say indent 'JOB(*) or JOB(jobname(jobnum))'
+  say indent 'JOBname(*) or JOBname(jobname(jobnum))'
   say indent2 '* = the current/active job'
   say indent2 'or the jobname(jobnum) - e.g. MYJOB(J01234)'
   say indent2 'or jobname, or jobname*'
-  say indent 'DD(*) or DD(ddname)'
+  say indent 'DDname(*) or DDname(ddname)'
   say indent2 '* = all DDnames (subject to SYS setting)'
   say indent2 'ddname is a specific ddname'
   say indent 'DATE(blank or JOB)'
@@ -395,22 +406,28 @@ Tutor:
   say indent2 'Yes - if under ISPF invoke LMDLIST for the extracted datasets'
   say indent2 'No - do not use LMDLIST even if under ISPF'
   say indent2 'Default is Yes'
-  say indent 'OWNER(blank or owning userid)'
+  say indent 'OWNer(blank or owning userid)'
   say indent2 'Default is to set owner to blank for all users,'
   say indent2 'or valid userid.'
-  say indent 'QUAL(qualifier)'
+  say indent 'HLQ(high-level-qualifier)'
+  say indent2 'This is the 1nd level qualifier for the extracted'
+  say indent2 'sysout dataset names'
+  say indent2 'Default is userid or users prefix'
+  say indent 'QUALifier(qualifier)'
   say indent2 'This is the 2nd level qualifier after the userid/prefix'
   say indent2 'for the extracted sysout dataset names'
   say indent2 'Default is X'
-  say indent 'STEP(*) or STEP(stepname)'
+  say indent 'STEPname(*) or STEPname(stepname)'
   say indent2 '* = all steps'
   say indent2 'Specific stepname'
-  say indent 'SUF(suffix) or SUF(NONE)'
+  say indent 'SUFfix(suffix) or SUFfix(NONE)'
   say indent2 'The extracted sysout dataset name suffix or NONE'
   say indent2 'Must not exceed 7 characters'
-  say indent 'SYS(Yes or No)'
+  say indent 'SYStem(Yes or No)'
   say indent2 'Yes to include the System Sysout (JESMSGLG, JESSYSMG, JESJCL)'
   say indent2 'No to exclude them (Default)'
+  say ' '
+  say indent2 'Abbreviations in CAPs'
   say ' '
   say indent  'Be careful the generated dataset name does not exceed 44'
   say indent   'characters as then it will be invalid.'
@@ -426,14 +443,11 @@ Build_DSN_HLQ:
   parse value timer.ix with hh':'mm':'.
   if hh < 10 then hh = right(hh+100,2)
   dsn_time = hh''mm
-  if sysvar('syspref') /= null
-  then sdsfdsn = sysvar('syspref')
-  else sdsfdsn = sysvar('sysuid')
   /* Suggest using job submission or start time */
   if dopt = null then do
-    sdsfdsn = sdsfdsn'.'qual'.D'dsn_date'.T'dsn_time
+    sdsfdsn = hlq'.'qual'.D'dsn_date'.T'dsn_time
   end
   else do
-    sdsfdsn = sdsfdsn'.'jobid.ix
+    sdsfdsn = hlq'.'jobid.ix
   end
   return

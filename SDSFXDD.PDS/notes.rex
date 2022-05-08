@@ -9,14 +9,15 @@ sysout data for all, or selected, DDs into z/OS datasets.
 
 Syntax:
 
-               %sdsfxdd JOB(jobname(jobid)) +
-                  STEP(stepname) +
-                  DD(ddname) +
-                  QUAL(qualifier) +
-                  SUF(suffix) +
-                  LIST(list) +
-                  OWNER(owner) +
-                  SYS(sys) +
+               %sdsfxdd JOBname(jobname(jobid)) +
+                  STEPname(stepname) +
+                  DDname(ddname) +
+                  HLQ(high-level-qualifier) +
+                  QUALifier(qualifier) +
+                  SUFfix(suffix) +
+                  LISt(list) +
+                  OWNer(owner) +
+                  SYStem(sys) +
                   DATE(date)
 
 Keywords:
@@ -28,6 +29,9 @@ Keywords:
                stepname is the job step name (e.g. STEP1)
                               or * for all steps
                ddname is the ddname to extract (or * for all)
+               hlq is used as the high-level-qualifer for the
+                   generated datasets
+                   ** the default is the userid or prefix
                qualifier is the 2nd level qualifier (single
                   level) - Default is X
                suffix is the suffix to be used for the
@@ -65,7 +69,7 @@ Keywords:
           to a rare situation where the sdsf status returned no
           jobs found if the steps prior are quick. Not sure why
           this is happening but it was so the 1 second delay is
-          now incorporated.
-
+          now incorporated. This only applies if JOBname(*) is
+          specified.
 
    Dependencies:   Address SDSF support is required
