@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '0.98'
+  ver = '0.99'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -60,6 +60,7 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v0.99   2022/05/08 LBD - Report on owner value          |
   |    v0.98   2022/05/08 LBD - Improve duplicate correction   |
   |                           - add 1 second delay for JES     |
   |                             to catch up (needed but not    |
@@ -149,6 +150,7 @@
   say 'ddname:   ' ddname
   say 'qualifier:' qual
   say 'suffix:   ' suffix
+  say 'owner:    ' owner
   say 'list:     ' list
   say 'date:     ' dopt
   say 'sys:      ' sys

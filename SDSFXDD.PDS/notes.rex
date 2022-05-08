@@ -65,7 +65,7 @@ Keywords:
           to a rare situation where the sdsf status returned no
           jobs found if the steps prior are quick. Not sure why
           this is happening but it was so the 1 second delay is
-          not incorporated.
+          now incorporated.
 
 
    Dependencies:   Address SDSF support is required
