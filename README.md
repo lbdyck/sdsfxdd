@@ -34,7 +34,7 @@ Note: Abbreviations are in CAPs.
  | DD | Specify the DDname to be processed <br /> ddname or * for all ddnames <br /> masking is not supported at this time |
  | OWNER | Specify the owning userid <br /> or default to ALL users |
  | DATE | if non-blank then use JOBID <br> or default to job creation date and time |
- | HLQL | Specify the 1st level qualifier for the generated dataset names <br /> the default  will be the users USERID or PREFIX <br />
+ | HLQ | Specify the 1st level qualifier for the generated dataset names <br /> the default  will be the users USERID or PREFIX <br />
  | QUAL | Specify the 2nd level qualifier for the generated dataset names <br /> the 1st qualifier will be the users USERID or PREFIX <br />
  | SUF | Specify the ***optional*** dataset suffix for the generated datasets <br />The default is no suffix or you can specify SUF(NONE) <br /> The suffix is limited to 7 characters |
  | LIST | Defines what the code does when it completes <br /> YES if under ISPF to display a dataset list (ISPF 3.4) of the datasets <br /> NO (default) to just exit |
