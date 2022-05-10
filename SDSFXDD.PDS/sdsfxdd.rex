@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.00'
+  ver = '1.01'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -66,6 +66,7 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v1.01   2022/05/10 LBD - Fix sleep test                 |
   |    v1.00   2022/05/08 LBD - Release 1.00 ready             |
   |                           - Thanks to Phil Smith III for   |
   |                             options parsing and QA         |
@@ -196,7 +197,7 @@
   | Wait for 1 second to allow JES to catch up |
   | but only for the active job                |
   * ------------------------------------------ */
-  if job = '*' then
+  if jobname = '*' then
      address 'SYSCALL' 'SLEEP (1)'
 
   /* --------------- *
