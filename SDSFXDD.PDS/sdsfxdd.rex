@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.01'
+  ver = '1.02'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -66,6 +66,8 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v1.02   2022/08/03 LBD - Report is job active and ds    |
+  |                             is blocked (possible missing)  |
   |    v1.01   2022/05/10 LBD - Fix sleep test                 |
   |    v1.00   2022/05/08 LBD - Release 1.00 ready             |
   |                           - Thanks to Phil Smith III for   |
@@ -276,6 +278,20 @@
 
         Address SDSF "ISFACT ST TOKEN('"j_TOKEN.idd"') PARM(NP SA)"
 
+        open_blk.0 = 0
+        if strip(actsys.ix) /= null then
+           if substr(j_recfm.idd,2,1) = 'B'
+           then do
+                open_blk.0 = 5
+                open_blk.1 = ' 'copies('-',70)
+                open_blk.2 = ' Note: The job is active and the DD is' ,
+                'blocked which means that any data'
+                open_blk.3 = ' in the last block',
+                             'may still be in the buffer and not availble.'
+                open_blk.4 = ' 'copies('-',70)
+                open_blk.5 = '  '
+                end
+
         blksize = (32760%j_lrecl.idd)*j_lrecl.idd
         space   = ((j_reccnt.idd*j_lrecl.idd)%56000)+1
 
@@ -292,6 +308,9 @@
           "ds("outdsn")" ,
           'space('space','space') lrecl('j_lrecl.idd')' ,
           'release recfm('recfm')'
+
+        if open_blk.0 > 0 then
+            'execio * diskw' ddn '(stem open_blk.'
 
         do forever
           'Execio 10000 diskr' isfddname.1 '(stem in.'

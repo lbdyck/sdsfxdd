@@ -72,4 +72,11 @@ Keywords:
           now incorporated. This only applies if JOBname(*) is
           specified.
 
+          If the job is active and the spool dataset is NOT
+          blocked then messages at the top of the data will
+          provide the user with that information so they know that
+          it is possible that some spool data may not have been
+          written to the spool and may still be in the spool
+          buffer.
+
    Dependencies:   Address SDSF support is required

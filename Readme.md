@@ -46,6 +46,9 @@ Note: Abbreviations are in CAPs.
  2. The generated dataset name will have a format of: hlq.qual.Dyyddd.Thhdd.stepname.ddname.suffix
  3. If the Step is within a PROC the PROC stepname is ignored
  4. If all jobs or all steps are processed there is a potential of duplicate stepname and ddname combinations. When this happens the dataset name will be suffixed with a .A up to .B. This suffix will increment withn the duplicate stepname and ddname.
+ 5. If the job is active and the spool dataset is NOT blocked then messages at the top of the data will provide the user
+     with that information so they know that it is possible that some spool data may not have been written to the spool
+     and may still be in the spool buffer.
 
  ## Disclaimer
 
