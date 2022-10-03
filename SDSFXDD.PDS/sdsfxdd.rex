@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.02'
+  ver = '1.03'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -66,6 +66,8 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v1.03   2022/10/03 LBD - Only report blocked if not     |
+  |                             me and foreground              |
   |    v1.02   2022/08/03 LBD - Report is job active and ds    |
   |                             is blocked (possible missing)  |
   |    v1.01   2022/05/10 LBD - Fix sleep test                 |
@@ -86,7 +88,7 @@
   /* --------------- *
   | Define defaults |
   * --------------- */
-  parse value '' with null duplicates
+  parse value '' with null duplicates itsme
   ddn = 'sd'time('s')
 
   /* ---------------------- *
@@ -180,7 +182,10 @@
   /* ------------------------- *
   | check for current jobname |
   * ------------------------- */
-  if jobname = '*' then jobname = get_jobid()
+  if jobname = '*' then do
+     jobname = get_jobid()
+     itsme = 1
+     end
 
   /* ----------------------------------- *
   | Separate the jobid from the jobname |
@@ -278,18 +283,20 @@
 
         Address SDSF "ISFACT ST TOKEN('"j_TOKEN.idd"') PARM(NP SA)"
 
-        open_blk.0 = 0
         if strip(actsys.ix) /= null then
            if substr(j_recfm.idd,2,1) = 'B'
+           then if sysvar('sysenv') = 'FORE'
+           then if itsme = null
            then do
-                open_blk.0 = 5
-                open_blk.1 = ' 'copies('-',70)
-                open_blk.2 = ' Note: The job is active and the DD is' ,
+                say '  '
+                say ' 'copies('-',70)
+                rdd = j_ddname.idd
+                say ' Note: The job is active and' rdd 'is' ,
                 'blocked which means that any data'
-                open_blk.3 = ' in the last block',
-                             'may still be in the buffer and not availble.'
-                open_blk.4 = ' 'copies('-',70)
-                open_blk.5 = '  '
+                say ' in the last block',
+                    'may still be in the buffer and not availble.'
+                say ' 'copies('-',70)
+                say '  '
                 end
 
         blksize = (32760%j_lrecl.idd)*j_lrecl.idd
@@ -308,9 +315,6 @@
           "ds("outdsn")" ,
           'space('space','space') lrecl('j_lrecl.idd')' ,
           'release recfm('recfm')'
-
-        if open_blk.0 > 0 then
-            'execio * diskw' ddn '(stem open_blk.'
 
         do forever
           'Execio 10000 diskr' isfddname.1 '(stem in.'
