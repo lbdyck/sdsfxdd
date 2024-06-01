@@ -23,7 +23,7 @@ the z/OS limit of 44 characters.
    OWNer(owner) +
    SYStem(sys) +
    DATE(date)
-   PRODUCT(product)
+   PRODuct(product)
 ```
 
 Note: Abbreviations are in CAPs.
