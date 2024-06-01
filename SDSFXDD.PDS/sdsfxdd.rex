@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.03'
+  ver = '1.04'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -14,7 +14,8 @@
   |               LISt(list) +                                 |
   |               OWNer(owner) +                               |
   |               SYStem(sys) +                                |
-  |               DATE(date)                                   |
+  |               DATE(date) +                                 |
+  |               PRODuct(product)                             |
   |                                                            |
   |            Abbreviations in CAPs.                          |
   |                                                            |
@@ -40,6 +41,7 @@
   |              JESMSGLG, JESYSMSG and JESJCL                 |
   |            date - default to use job creation date/time    |
   |                   any character for jobid (e.g. JOBnnnnn)  |
+  |            product is either SDSF or EJES. Default is SDSF.|
   |                                                            |
   |            *** Qual may be no more than 8 characters       |
   |                and must conform to z/OS dataset naming     |
@@ -66,6 +68,7 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v1.04   2024/05/29 EEJ - Add support for (E)JES         |
   |    v1.03   2022/10/03 LBD - Only report blocked if not     |
   |                             me and foreground              |
   |    v1.02   2022/08/03 LBD - Report is job active and ds    |
@@ -77,7 +80,7 @@
   |            2021/09/20 LBD - Creation                       |
   |                                                            |
   * ---------------------------------------------------------- *
-  | Copyright (c) 2021-2022 by Lionel B. Dyck under the MIT    |
+  | Copyright (c) 2021-2024 by Lionel B. Dyck under the MIT    |
   | License                                                    |
   | https://mit-license.org                                    |
   * ---------------------------------------------------------- */
@@ -100,7 +103,7 @@
   | Determine which keywords we have |
   * -------------------------------- */
   parse value '' with ddname jobname stepname suffix qual list ,
-    owner dopt sys hlq
+    owner dopt sys hlq prod
   do while options <> ''
     parse var options option '(' value ')' options
     option = strip(option)
@@ -120,12 +123,16 @@
       when abbrev('OWNER', option, 3)     then owner    = value
       when abbrev('DATE', option, 4)      then dopt     = value
       when abbrev('SYSTEM', option, 3)    then sys      = value
+      when abbrev('PRODUCT', option, 4)   then prod     = value
       otherwise do
         say 'Invalid option "'option'"'
         exit 8
       end
     end
   end
+
+  if prod = 'EJES' then prodhce = 'EJESISFX'
+  else prodhce = 'ISFCALLS'
 
   if qual = null then qual = 'X'
   else if length(qual) > 8 then do
@@ -216,7 +223,7 @@
   /* ----------------- *
   | Begin the Process |
   * ----------------- */
-  rc=isfcalls('ON')
+  interpret "rc="prodhce"('ON')"
   isfprefix = '*'
   isfdest   = ''
   if owner = null
@@ -282,21 +289,20 @@
         say 'sdsfxdd:         Dataset:' outdsn
 
         Address SDSF "ISFACT ST TOKEN('"j_TOKEN.idd"') PARM(NP SA)"
+        open_blk.0 = 0
 
         if strip(actsys.ix) /= null then
            if substr(j_recfm.idd,2,1) = 'B'
            then if sysvar('sysenv') = 'FORE'
            then if itsme = null
            then do
-                say '  '
-                say ' 'copies('-',70)
-                rdd = j_ddname.idd
-                say ' Note: The job is active and' rdd 'is' ,
-                'blocked which means that any data'
-                say ' in the last block',
-                    'may still be in the buffer and not availble.'
-                say ' 'copies('-',70)
-                say '  '
+                open_blk.0 = 5
+                open_blk.1 = ' 'copies('-',70)
+                open_blk.2 = ' Note: The job is active and the DD is' ,
+                             'blocked which means that any data'
+                open_blk.3 = ' in the last block',
+                open_blk.4 = ' 'copies('-',70)
+                open_blk.5 = '  '
                 end
 
         blksize = (32760%j_lrecl.idd)*j_lrecl.idd
@@ -315,6 +321,9 @@
           "ds("outdsn")" ,
           'space('space','space') lrecl('j_lrecl.idd')' ,
           'release recfm('recfm')'
+
+        if open_blk.0 > 0 then
+            'execio * diskw' ddn '(stem open_blk.'
 
         do forever
           'Execio 10000 diskr' isfddname.1 '(stem in.'
@@ -357,7 +366,7 @@
   | Done so cleanup and exit |
   * ------------------------ */
 done:
-  rc=isfcalls('OFF')
+  interpret "rc="prodhce"('OFF')"
   exit 0
 
 Get_Ext: Procedure expose ext duplicates outdsn

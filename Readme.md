@@ -23,6 +23,7 @@ the z/OS limit of 44 characters.
    OWNer(owner) +
    SYStem(sys) +
    DATE(date)
+   PRODUCT(product)
 ```
 
 Note: Abbreviations are in CAPs.
@@ -39,6 +40,7 @@ Note: Abbreviations are in CAPs.
  | SUF | Specify the ***optional*** dataset suffix for the generated datasets <br />The default is no suffix or you can specify SUF(NONE) <br /> The suffix is limited to 7 characters |
  | LIST | Defines what the code does when it completes <br /> YES if under ISPF to display a dataset list (ISPF 3.4) of the datasets <br /> NO (default) to just exit |
  | SYS | Specify if the System generated files (JESMSGLG, JESYSMSG, and JESJCL) are to be included <br /> YES or NO |
+ | PRODuct | Either SDSF or EJES (SDSF is the default) |
 
  ## Notes:
 
@@ -57,7 +59,7 @@ Note: Abbreviations are in CAPs.
  ## License
 
 The MIT License (MIT)
-Copyright © 2021-2022 <copyright holders>
+Copyright © 2021-2024 <copyright holders>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the Software), to deal in the Software without restriction, including without

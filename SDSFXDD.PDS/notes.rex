@@ -18,7 +18,8 @@ Syntax:
                   LISt(list) +
                   OWNer(owner) +
                   SYStem(sys) +
-                  DATE(date)
+                  DATE(date) +
+                  PRODuct(product)
 
 Keywords:
 
@@ -44,6 +45,7 @@ Keywords:
                  JESMSGLG, JESYSMSG and JESJCL
                date - default to use job creation date/time
                       any character for jobid (e.g. JOBnnnnn)
+               product is either SDSF or EJES. Default is SDSF.
 
                *** Qual may be no more than 8 characters
                    and must conform to z/OS dataset naming
@@ -80,3 +82,4 @@ Keywords:
           buffer.
 
    Dependencies:   Address SDSF support is required
+                   or (E)JES
