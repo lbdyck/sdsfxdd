@@ -1,9 +1,11 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.04'
+  ver = '1.05'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
   |            to z/OS datasets.                               |
+  |                                                            |
+  | Customization: Find *custom* for site customizations       |
   |                                                            |
   | Syntax:    %sdsfxdd JOBname(jobname(jobid)) +              |
   |               STEPname(stepname) +                         |
@@ -14,8 +16,7 @@
   |               LISt(list) +                                 |
   |               OWNer(owner) +                               |
   |               SYStem(sys) +                                |
-  |               DATE(date) +                                 |
-  |               PRODuct(product)                             |
+  |               DATE(date)                                   |
   |                                                            |
   |            Abbreviations in CAPs.                          |
   |                                                            |
@@ -41,7 +42,6 @@
   |              JESMSGLG, JESYSMSG and JESJCL                 |
   |            date - default to use job creation date/time    |
   |                   any character for jobid (e.g. JOBnnnnn)  |
-  |            product is either SDSF or EJES. Default is SDSF.|
   |                                                            |
   |            *** Qual may be no more than 8 characters       |
   |                and must conform to z/OS dataset naming     |
@@ -68,6 +68,8 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v1.05   2024/06/01 LBD - Improve customization for      |
+  |                             SDSF/(E)JES                    |
   |    v1.04   2024/05/29 EEJ - Add support for (E)JES         |
   |    v1.03   2022/10/03 LBD - Only report blocked if not     |
   |                             me and foreground              |
@@ -93,6 +95,13 @@
   * --------------- */
   parse value '' with null duplicates itsme
   ddn = 'sd'time('s')
+
+  /* ---- *custom* ---- *
+   | Site Customization |
+   | Prod: SDSF         |
+   |       EJES         |
+   * ------------------ */
+   prod = 'SDSF'
 
   /* ---------------------- *
   | Check for help request |
@@ -131,8 +140,6 @@
     end
   end
 
-  if prod = 'EJES' then prodhce = 'EJESISFX'
-  else prodhce = 'ISFCALLS'
 
   if qual = null then qual = 'X'
   else if length(qual) > 8 then do
@@ -223,7 +230,9 @@
   /* ----------------- *
   | Begin the Process |
   * ----------------- */
-  interpret "rc="prodhce"('ON')"
+  if prod = 'SDSF'
+     then rc = ISFCALLS('ON')
+     else rc = EJESISFX('ON')
   isfprefix = '*'
   isfdest   = ''
   if owner = null
@@ -366,7 +375,9 @@
   | Done so cleanup and exit |
   * ------------------------ */
 done:
-  interpret "rc="prodhce"('OFF')"
+  if prod = 'SDSF'
+     then rc = ISFCALLS('OFF')
+     else rc = EJESISFX('OFF')
   exit 0
 
 Get_Ext: Procedure expose ext duplicates outdsn

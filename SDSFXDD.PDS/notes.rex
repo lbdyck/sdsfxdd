@@ -2,6 +2,8 @@ SDSFXDD is a tool, written in REXX, that utilizes the SDSF REXX API
 (which should also work with (E)JES and any other spool access product
 that supports the SDSF REXX API).
 
+Customizations:  Find in the code *custom* and do what it says
+
 Purpose:
 
 SDSFXDD is intended to be used as a step within a batch job to extract
@@ -18,8 +20,7 @@ Syntax:
                   LISt(list) +
                   OWNer(owner) +
                   SYStem(sys) +
-                  DATE(date) +
-                  PRODuct(product)
+                  DATE(date)
 
 Keywords:
 
@@ -45,7 +46,6 @@ Keywords:
                  JESMSGLG, JESYSMSG and JESJCL
                date - default to use job creation date/time
                       any character for jobid (e.g. JOBnnnnn)
-               product is either SDSF or EJES. Default is SDSF.
 
                *** Qual may be no more than 8 characters
                    and must conform to z/OS dataset naming

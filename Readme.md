@@ -10,6 +10,11 @@ The command is generalized so the user has flexibility in numerous places with
 the singluar exception that the generated dataset name  **must** not exceed
 the z/OS limit of 44 characters.
 
+## Customization
+
+Find in the code the string `*custom*` and do change the variable for
+either SDSF or EJES.
+
 ## Syntax
 
 ```
@@ -23,7 +28,6 @@ the z/OS limit of 44 characters.
    OWNer(owner) +
    SYStem(sys) +
    DATE(date)
-   PRODuct(product)
 ```
 
 Note: Abbreviations are in CAPs.
@@ -40,7 +44,6 @@ Note: Abbreviations are in CAPs.
  | SUF | Specify the ***optional*** dataset suffix for the generated datasets <br />The default is no suffix or you can specify SUF(NONE) <br /> The suffix is limited to 7 characters |
  | LIST | Defines what the code does when it completes <br /> YES if under ISPF to display a dataset list (ISPF 3.4) of the datasets <br /> NO (default) to just exit |
  | SYS | Specify if the System generated files (JESMSGLG, JESYSMSG, and JESJCL) are to be included <br /> YES or NO |
- | PRODuct | Either SDSF or EJES (SDSF is the default) |
 
  ## Notes:
 
