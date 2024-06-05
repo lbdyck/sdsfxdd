@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.05'
+  ver = '1.06'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -9,6 +9,7 @@
   |                                                            |
   | Syntax:    %sdsfxdd JOBname(jobname(jobid)) +              |
   |               STEPname(stepname) +                         |
+  |               PROCstep(procstep) +                         |
   |               DDname(ddname) +                             |
   |               HLQ(high-level-qualifier) +                  |
   |               QUALifier(qualifier) +                       |
@@ -26,6 +27,8 @@
   |                           or * for the current job         |
   |            stepname is the job step name (e.g. STEP1)      |
   |                           or * for all steps               |
+  |            procstep is the job proc step name              |
+  |                           or * for all procsteps           |
   |            ddname is the ddname to extract (or * for all)  |
   |            hlq is used as the high-level-qualifer for the  |
   |                generated datasets                          |
@@ -68,6 +71,7 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v1.06   2024/06/05 LBD - Add PROCSTEP                   |
   |    v1.05   2024/06/01 LBD - Improve customization for      |
   |                             SDSF/(E)JES                    |
   |    v1.04   2024/05/29 EEJ - Add support for (E)JES         |
@@ -112,7 +116,7 @@
   | Determine which keywords we have |
   * -------------------------------- */
   parse value '' with ddname jobname stepname suffix qual list ,
-    owner dopt sys hlq prod
+    owner dopt sys hlq procstep
   do while options <> ''
     parse var options option '(' value ')' options
     option = strip(option)
@@ -125,6 +129,7 @@
       when abbrev('DDNAME', option, 2)    then ddname   = value
       when abbrev('JOBNAME', option, 3)   then jobname  = value
       when abbrev('STEPNAME', option, 4)  then stepname = value
+      when abbrev('PROCSTEP', option, 4)  then procstep = value
       when abbrev('SUFFIX', option, 3)    then suffix   = value
       when abbrev('HLQ', option, 3)       then hlq      = value
       when abbrev('QUALIFIER', option, 4) then qual     = value
@@ -174,6 +179,7 @@
   Say 'Processing Options:'
   say 'jobname:  ' jobname
   say 'stepname: ' stepname
+  say 'procstep: ' procstep
   say 'ddname:   ' ddname
   say 'hlq:      ' hlq
   say 'qualifier:' qual
@@ -224,8 +230,12 @@
   /* --------------- *
   | Inform the user |
   * --------------- */
-  say 'Processing Job:' jobname 'for Step:' stepname 'with DDname:' ddname ,
-    'with Suffix:' suffix
+  say 'Processing Job:' jobname
+  say 'StepName:      '  stepname
+  if procstep /= null then
+     say 'PROCStep:      '  procstep
+  say 'DDName:        ' ddname
+  say 'Suffix:        ' suffix
 
   /* ----------------- *
   | Begin the Process |
@@ -270,6 +280,9 @@
         if wordpos(j_ddname.idd,'JESMSGLG JESYSMSG JESJCL') > 0 then iterate
         if stepname /= '*' then
         if j_stepn.idd /= stepname then iterate
+        if procstep /= null then
+        if procstep /= '*' then
+        if j_procs.idd /= procstep then iterate
         if ddname /= '*' then
         if ddname /= j_ddname.idd then iterate
 
@@ -294,8 +307,12 @@
           say ' '
           exit 16
         end
-        say 'sdsfxdd: Extracting Step:' j_stepn.idd 'DD:' j_ddname.idd
-        say 'sdsfxdd:         Dataset:' outdsn
+        say 'sdsfxdd: Extracting:'
+        say '    Step: ' j_stepn.idd
+        if procstep /= null then
+           say '    ProcStep:' j_procs.idd
+        say '    DD:      ' j_ddname.idd
+        say '    Dataset: ' outdsn
 
         Address SDSF "ISFACT ST TOKEN('"j_TOKEN.idd"') PARM(NP SA)"
         open_blk.0 = 0
@@ -464,6 +481,9 @@ Tutor:
   say indent 'STEPname(*) or STEPname(stepname)'
   say indent2 '* = all steps'
   say indent2 'Specific stepname'
+  say indent 'PROCstep(*) or PROCstep(procstep)'
+  say indent2 '* = all proc steps'
+  say indent2 'Specific procstep name'
   say indent 'SUFfix(suffix) or SUFfix(NONE)'
   say indent2 'The extracted sysout dataset name suffix or NONE'
   say indent2 'Must not exceed 7 characters'

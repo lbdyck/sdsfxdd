@@ -13,6 +13,7 @@ Syntax:
 
                %sdsfxdd JOBname(jobname(jobid)) +
                   STEPname(stepname) +
+                  PROCstep(procstep) +
                   DDname(ddname) +
                   HLQ(high-level-qualifier) +
                   QUALifier(qualifier) +
@@ -30,6 +31,8 @@ Keywords:
                               or * for the current job
                stepname is the job step name (e.g. STEP1)
                               or * for all steps
+               procstep is the job proc step name (e.g. PROC1)
+                              or * for all proc steps
                ddname is the ddname to extract (or * for all)
                hlq is used as the high-level-qualifer for the
                    generated datasets
