@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.07'
+  ver = '2.00'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -19,7 +19,15 @@
   |               SYStem(sys) +                                |
   |               DATE(date) +                                 |
   |               UNit(unit) +                                 |
-  |               DIsp(disp)                                   |
+  |               DIsp(disp) +                                 |
+  |               REPort(report) +                             |
+  |               OUTstem(outstem) +                           |
+  |               STORclas(storclas) +                         |
+  |               MGMTclas(mgmtclas) +                         |
+  |               DATAclas(dataclas) +                         |
+  |               VOLume(volume) +                             |
+  |               WAIt(wait) +                                 |
+  |               TRace(trace)                                  |
   |                                                            |
   |            Abbreviations in CAPs.                          |
   |                                                            |
@@ -89,6 +97,11 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v2.00   2026/11/23 PJF - Add REPORT, OUTStem, SMS,      |
+  |                             WAIT, and TRACE options        |
+  |                           - Add DD/STEP/PROCSTEP masks      |
+  |                           - Improve validation and cleanup |
+  |                           - Add allocation safeguards       |
   |    v1.07   2026/11/23 PJF - Add UNIT and DISP parameters   |
   |                           - Use Qualifier in dataset name  |
   |                             when DATE argument is used     |
@@ -124,6 +137,8 @@
   * --------------- */
   parse value '' with null duplicates itsme
   ddn = 'sd'time('s')
+  api_on = 'NO'
+  matchcount = 0
 
   /* ---- *custom* ---- *
    | Site Customization |
@@ -141,7 +156,8 @@
   | Determine which keywords we have |
   * -------------------------------- */
   parse value '' with ddname jobname stepname suffix qual list ,
-    owner dopt sys hlq procstep unit disp
+    owner dopt sys hlq procstep unit disp report outstem ,
+    storclas mgmtclas dataclas volume wait trace
   do while inoptions <> ''
     parse var inoptions option '(' optval ')' inoptions
     option = strip(option)
@@ -167,9 +183,18 @@
       when abbrev('PRODUCT', option, 4)   then prod     = optval
       when abbrev('UNIT', option, 2)      then unit     = optval
       when abbrev('DISP', option, 2)      then disp     = optval
+      when abbrev('REPORT', option, 3)    then report   = optval
+      when abbrev('OUTSTEM', option, 3)   then outstem  = optval
+      when abbrev('STORCLAS', option, 4)  then storclas = optval
+      when abbrev('MGMTCLAS', option, 4)  then mgmtclas = optval
+      when abbrev('DATACLAS', option, 4)  then dataclas = optval
+      when abbrev('VOLUME', option, 3)    then volume   = optval
+      when abbrev('WAIT', option, 2)      then wait     = optval
+      when abbrev('TRACE', option, 2)     then trace    = optval
+      when abbrev('VERSION', option, 3)   then call show_version
       otherwise do
         say 'Invalid option "'option'"'
-        exit 8
+        call cleanup_and_exit 8
       end
     end
   end
@@ -181,7 +206,11 @@
   if qual = null then qual = 'X'
   else if length(qual) > 8 then do
     say 'Qualifier must not exceed 8 characters'
-    exit 8
+    call cleanup_and_exit 8
+  end
+  if \validate_dsn_component(qual) then do
+    say 'Qualifier "'qual'" contains invalid dataset-name characters'
+    call cleanup_and_exit 8
   end
 
   /* ----------------------------------- *
@@ -193,7 +222,11 @@
      upper unit
      if length(unit) > 8 then do
         say 'UNIT must not exceed 8 characters'
-        exit 8
+        call cleanup_and_exit 8
+     end
+     if \validate_dsn_component(unit) then do
+        say 'UNIT "'unit'" contains invalid dataset-name characters'
+        call cleanup_and_exit 8
      end
   end
 
@@ -206,7 +239,7 @@
      upper disp
      if length(disp) <> 3 | pos(disp, 'NEW OLD MOD SHR') = 0 then do
         say disp 'is not a valid DISP value'
-        exit 8
+        call cleanup_and_exit 8
      end
   end
 
@@ -214,15 +247,69 @@
   | Test for List specification |
   * --------------------------- */
   if list = null then list = 'YES'
+  upper list
+  if list <> 'YES' & list <> 'NO' & list <> 'RETURN' then do
+    say 'LIST must be YES, NO, or RETURN'
+    call cleanup_and_exit 8
+  end
+
+  if report = null then report = 'NO'
+  else do
+    upper report
+    if report <> 'YES' & report <> 'NO' then do
+      say 'REPORT must be YES or NO'
+      call cleanup_and_exit 8
+    end
+  end
+
+  if trace = null then trace = 'NO'
+  else do
+    upper trace
+    if trace <> 'YES' & trace <> 'NO' then do
+      say 'TRACE must be YES or NO'
+      call cleanup_and_exit 8
+    end
+  end
+
+  if wait = null then wait = 0
+  else if datatype(wait) <> 'NUM' | wait < 0 then do
+    say 'WAIT must be a non-negative number of seconds'
+    call cleanup_and_exit 8
+  end
 
   if jobname  = null then call tutor
   if stepname = null then call tutor
   if ddname   = null then call tutor
-
   if hlq = null then do
     if sysvar('syspref') /= null
     then hlq = sysvar('syspref')
     else hlq = sysvar('sysuid')
+  end
+  upper hlq jobname stepname procstep ddname owner sys qual suffix ,
+    prod storclas mgmtclas dataclas volume
+  if \validate_dsn_name(hlq) then do
+    say 'HLQ "'hlq'" is not a valid dataset-name qualifier'
+    call cleanup_and_exit 8
+  end
+  if storclas <> null & (length(storclas) > 8 | ,
+     \validate_dsn_component(storclas)) then do
+    say 'STORCLAS "'storclas'" is invalid'
+    call cleanup_and_exit 8
+  end
+  if mgmtclas <> null & (length(mgmtclas) > 8 | ,
+     \validate_dsn_component(mgmtclas)) then do
+    say 'MGMTCLAS "'mgmtclas'" is invalid'
+    call cleanup_and_exit 8
+  end
+  if dataclas <> null & (length(dataclas) > 8 | ,
+     \validate_dsn_component(dataclas)) then do
+    say 'DATACLAS "'dataclas'" is invalid'
+    call cleanup_and_exit 8
+  end
+  if volume <> null & (length(volume) > 6 | ,
+     \validate_dsn_component(volume)) then do
+    say 'VOLUME "'volume'" is invalid'
+    call cleanup_and_exit 8
   end
 
   /* -------------------------------------------------------- *
@@ -231,7 +318,11 @@
   * -------------------------------------------------------- */
   if length(suffix) > 7 then do
     say 'Suffix is invalid as it is longer than the allowed 7 characters'
-    exit 8
+    call cleanup_and_exit 8
+  end
+  if suffix <> null & suffix <> 'NONE' & \validate_dsn_component(suffix) then do
+    say 'Suffix "'suffix'" contains invalid dataset-name characters'
+    call cleanup_and_exit 8
   end
 
   Say 'Processing Options:'
@@ -246,8 +337,16 @@
   say 'list:     ' list
   say 'date:     ' dopt
   say 'sys:      ' sys
-  say 'unit      ' unit
-  say 'disp      ' disp
+  say 'unit:     ' unit
+  say 'disp:     ' disp
+  say 'report:   ' report
+  say 'outstem:  ' outstem
+  say 'storclas: ' storclas
+  say 'mgmtclas: ' mgmtclas
+  say 'dataclas: ' dataclas
+  say 'volume:   ' volume
+  say 'wait:     ' wait
+  say 'trace:    ' trace
 
   if sys = 'NO' then sys = null
 
@@ -284,8 +383,11 @@
   | Wait for 1 second to allow JES to catch up |
   | but only for the active job                |
   * ------------------------------------------ */
-  if jobname = '*' then
-     address 'SYSCALL' 'SLEEP (1)'
+  if itsme = 1 then do
+     if wait > 0
+     then address 'SYSCALL' 'SLEEP ('wait')'
+     else address 'SYSCALL' 'SLEEP (1)'
+  end
 
   /* --------------- *
   | Inform the user |
@@ -297,17 +399,35 @@
   say 'DDName:        ' ddname
   say 'Suffix:        ' suffix
 
+  if outstem <> null then do
+    if \validate_rexx_symbol(outstem) then do
+      say 'OUTStem "'outstem'" is not a valid Rexx stem name'
+      call cleanup_and_exit 8
+    end
+    interpret outstem'.0=0'
+  end
+
+  if trace = 'YES' then
+    say 'TRACE: Starting product' prod 'jobname' jobname ,
+      'stepname' stepname 'procstep' procstep 'ddname' ddname
+
   /* ----------------- *
   | Begin the Process |
   * ----------------- */
   if prod = 'SDSF'
      then rc = ISFCALLS('ON')
      else rc = EJESISFX('ON')
+  if rc = 0 then api_on = 'YES'
+  else do
+     say 'Unable to initialize' prod 'support - rc:' rc
+     call cleanup_and_exit rc
+  end
   isfprefix = '*'
   isfdest   = ''
   if owner = null
   then isfowner  = ''
   else isfowner  = owner
+  if trace = 'YES' then say 'TRACE: ISFEXEC ST' jobname
   Address SDSF "ISFEXEC ST" jobname
   lrc=rc
   if lrc<>0 then do
@@ -315,12 +435,12 @@
     do i = 1 to isfmsg2.0
       say isfmsg2.i
     end
-    exit lrc
+    call cleanup_and_exit lrc
   end
 
   if jname.0 = 0 then do
     say jname.0 'jobs found matching the provided jobname' jobname
-    exit 0
+    call cleanup_and_exit 0
   end
 
   /* --------------------------------------- *
@@ -339,12 +459,12 @@
         if sys = null then
         if wordpos(j_ddname.idd,'JESMSGLG JESYSMSG JESJCL') > 0 then iterate
         if stepname /= '*' then
-        if j_stepn.idd /= stepname then iterate
+        if \match_mask(j_stepn.idd,stepname) then iterate
         if procstep /= null then
         if procstep /= '*' then
-        if j_procs.idd /= procstep then iterate
+        if \match_mask(j_procs.idd,procstep) then iterate
         if ddname /= '*' then
-        if ddname /= j_ddname.idd then iterate
+        if \match_mask(j_ddname.idd,ddname) then iterate
 
         outdsn = "'"sdsfdsn'.'j_stepn.idd'.'j_ddname.idd''suf"'"
 
@@ -366,7 +486,7 @@
                        say 'Suggest using' ,
                          'unique SUF value for each extraction.'
                     say ' '
-                    exit 16
+                    call cleanup_and_exit 16
                  end
               end
               else leave
@@ -383,8 +503,22 @@
            say 'Suggest reducing the size of the QUAL, the size of' ,
              'the SUF, or setting SUF to NONE.'
            say ' '
-           exit 16
+           call cleanup_and_exit 16
         end
+
+        if report = 'YES' then do
+          say 'REPORT:'
+          say '    Step:    ' j_stepn.idd
+          if procstep /= null then
+             say '    ProcStep:' j_procs.idd
+          say '    DD:      ' j_ddname.idd
+          say '    DISP:    ' disp
+          say '    Dataset: ' outdsn
+          call record_output_dataset outdsn
+          matchcount = matchcount + 1
+          iterate
+        end
+
         say myname': Extracting:'
         say '    Step:    ' j_stepn.idd
         if procstep /= null then
@@ -410,33 +544,44 @@
                 open_blk.5 = '  '
                 end
 
-        blksize = (32760%j_lrecl.idd)*j_lrecl.idd
-        dspace  = ((j_reccnt.idd*j_lrecl.idd)%56000)+1
+        lrecl = strip(j_lrecl.idd)
+        reccnt = strip(j_reccnt.idd)
+        if datatype(lrecl) <> 'NUM' | lrecl <= 0 then lrecl = 0
+        if datatype(reccnt) <> 'NUM' | reccnt <= 0 then reccnt = 1
+        if lrecl > 0 then blksize = (32760%lrecl)*lrecl
+        else blksize = 32760
+        if blksize <= 0 then blksize = 32760
+        dspace = ((reccnt*lrecl)%56000)+1
+        if dspace < 1 then dspace = 1
 
-        recfm = left(j_recfm.idd,1) substr(j_recfm.idd,2,1) ,
-          substr(j_recfm.idd,3,1)
-
-        if left(recfm,1) /= 'U' then do
-          if substr(recfm,2,1) /= 'B' then
+        recfm = strip(left(j_recfm.idd,1) substr(j_recfm.idd,2,1) ,
+          substr(j_recfm.idd,3,1))
+        if left(recfm,1) /= 'U' & substr(recfm,2,1) /= 'B' then
           recfm = left(j_recfm.idd,1) 'B' substr(j_recfm.idd,3,1)
-        end
-        else recfm = 'V B' substr(j_recfm.idd,3,1)
+
+        call validate_target_dataset outdsn, disp, recfm, lrecl
 
         /* Alloc based on DISP parameter */
-        if disp = 'NEW' then
-           'Alloc f('ddn') new blksize('blksize') tracks' ,
-             "ds("outdsn")" "unit("unit")" ,
-             'space('dspace','dspace') lrecl('j_lrecl.idd')' ,
-             'release recfm('recfm')'
-        else do
-           'Alloc f('ddn')' disp "ds("outdsn")"
+        if disp = 'NEW' then do
+           alloccmd = 'Alloc f('ddn') new blksize('blksize') tracks' ,
+             'ds('outdsn') unit('unit')'
+           if storclas <> null then alloccmd = alloccmd 'storclas('storclas')'
+           if mgmtclas <> null then alloccmd = alloccmd 'mgmtclas('mgmtclas')'
+           if dataclas <> null then alloccmd = alloccmd 'dataclas('dataclas')'
+           if volume <> null then alloccmd = alloccmd 'volume('volume')'
+           alloccmd = alloccmd 'space('dspace','dspace')' ,
+             'lrecl('lrecl') release recfm('recfm')'
         end
+        else alloccmd = 'Alloc f('ddn')' disp 'ds('outdsn')'
+
+        if trace = 'YES' then say 'TRACE: 'alloccmd
+        alloccmd
 
         if RC <> 0 then do
           say 'Allocation of DSN' outdsn 'failed, correct input' ,
             'parameters and try again.'
           say ' '
-          exit 16
+          call cleanup_and_exit 16
         end
 
         if open_blk.0 > 0 then
@@ -453,13 +598,20 @@
           drop in.
         end
         'free f('ddn')'
+        call record_output_dataset outdsn
+        matchcount = matchcount + 1
         drop in.
 
       end
     end
   end
 
-  if list /= 'YES' then call done
+  if matchcount = 0 then do
+    say 'No DD entries matched the requested filters'
+    call cleanup_and_exit 4
+  end
+
+  if list /= 'YES' | report = 'YES' then call done
 
   /* ----------------------------------------------- *
   | Check for running under TSO and if so then      |
@@ -483,10 +635,66 @@
   | Done so cleanup and exit |
   * ------------------------ */
 done:
-  if prod = 'SDSF'
-     then rc = ISFCALLS('OFF')
-     else rc = EJESISFX('OFF')
-  exit 0
+  call cleanup_and_exit 0
+
+cleanup_and_exit: Procedure expose prod api_on trace
+  arg exit_rc
+  if api_on = 'YES' then do
+    if trace = 'YES' then say 'TRACE: Disconnecting' prod
+    if prod = 'SDSF'
+    then rc = ISFCALLS('OFF')
+    else rc = EJESISFX('OFF')
+  end
+  exit exit_rc
+
+record_output_dataset: Procedure expose outstem
+  arg dsn
+  if outstem = null then return
+  dsn = strip(dsn)
+  if left(dsn,1) = "'" & right(dsn,1) = "'" then
+    dsn = substr(dsn,2,length(dsn)-2)
+  interpret 'count='outstem'.0+1'
+  interpret outstem'.0=count'
+  interpret outstem'.'count'="'dsn'"'
+  return
+
+validate_target_dataset: Procedure expose trace prod api_on
+  arg dsn, disp_name, source_recfm, source_lrecl
+  dsn_plain = strip(dsn)
+  if left(dsn_plain,1) = "'" & right(dsn_plain,1) = "'" then
+    dsn_plain = substr(dsn_plain,2,length(dsn_plain)-2)
+  if disp_name = 'SHR' then do
+    say 'DISP(SHR) is not supported for extracting data.'
+    say 'Use DISP(NEW), DISP(OLD), or DISP(MOD).'
+    call cleanup_and_exit 16
+  end
+  if disp_name = 'OLD' | disp_name = 'MOD' then do
+    catalog_rc = sysdsn("'"dsn_plain"'")
+    if catalog_rc <> 'OK' then do
+      say 'Dataset' dsn_plain 'does not exist for DISP('disp_name')'
+      call cleanup_and_exit 16
+    end
+  end
+  if disp_name = 'MOD' & sysvar('sysenv') = 'FORE' then do
+    address TSO "LISTDSI('"dsn_plain"')"
+    if rc = 0 then do
+      existing_recfm = strip(sysrecfm)
+      existing_lrecl = strip(syslrecl)
+      if existing_lrecl <> null & datatype(existing_lrecl) = 'NUM' then
+      if source_lrecl > 0 & existing_lrecl <> source_lrecl then do
+        say 'MOD target LRECL 'existing_lrecl,
+          'does not match source LRECL 'source_lrecl
+        call cleanup_and_exit 16
+      end
+      if existing_recfm <> null & left(existing_recfm,1) <> ,
+        left(source_recfm,1) then do
+        say 'MOD target RECFM 'existing_recfm,
+          'does not match source RECFM 'source_recfm
+        call cleanup_and_exit 16
+      end
+    end
+  end
+  return
 
 Get_Ext: Procedure expose ext duplicates outdsn
   arg dsn
@@ -536,6 +744,62 @@ get_jobid: procedure
 ptr: return c2d(storage(d2x(arg(1)),4))
 stg: return storage(d2x(arg(1)),arg(2))
 
+match_mask: Procedure
+  arg value, mask
+  value = translate(strip(value))
+  mask = translate(strip(mask))
+  if mask = null then return value = null
+  if left(mask,1) = '*' then do
+    if length(mask) = 1 then return 1
+    restmask = substr(mask,2)
+    if match_mask(value,restmask) then return 1
+    if value <> null then
+      if match_mask(substr(value,2),mask) then return 1
+    return 0
+  end
+  if value = null then return 0
+  if left(mask,1) = '?' | left(mask,1) = left(value,1) then
+    return match_mask(substr(value,2),substr(mask,2))
+  return 0
+
+validate_dsn_component: Procedure
+  arg component
+  component = strip(component)
+  if component = null | length(component) > 8 then return 0
+  if pos(left(component,1),'-') = 1 | ,
+     pos(right(component,1),'-') = 1 then return 0
+  valid = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$#@-'
+  do i = 1 to length(component)
+    if pos(substr(component,i,1),valid) = 0 then return 0
+  end
+  return 1
+
+validate_dsn_name: Procedure
+  arg dsn
+  dsn = strip(dsn)
+  if dsn = null | length(dsn) > 44 then return 0
+  do while dsn <> null
+    parse var dsn component '.' dsn
+    if \validate_dsn_component(component) then return 0
+  end
+  return 1
+
+validate_rexx_symbol: Procedure
+  arg symbol
+  symbol = strip(symbol)
+  if symbol = null then return 0
+  first = substr(symbol,1,1)
+  if pos(first,'ABCDEFGHIJKLMNOPQRSTUVWXYZ_#$@') = 0 then return 0
+  valid = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_#$@'
+  do i = 2 to length(symbol)
+    if pos(substr(symbol,i,1),valid) = 0 then return 0
+  end
+  return 1
+
+show_version: Procedure expose ver myname
+  say myname 'Version:' ver
+  exit 0
+
 Tutor: Procedure expose myname
   say ' '
   say copies('-',72)
@@ -582,6 +846,19 @@ Tutor: Procedure expose myname
   say indent 'SYStem(Yes or No)'
   say indent2 'Yes to include the System Sysout (JESMSGLG, JESSYSMG, JESJCL)'
   say indent2 'No to exclude them (Default)'
+  say indent 'REPort(Yes or No)'
+  say indent2 'Yes to report matching DDs and names without extracting'
+  say indent2 'No is the default'
+  say indent 'OUTstem(stemname)'
+  say indent2 'Optional stem populated with generated/extracted dataset names'
+  say indent 'STORclas(storclas), MGMTclas(mgmtclas), DATAclas(dataclas)'
+  say indent2 'Optional SMS attributes for DISP(NEW)'
+  say indent 'VOLume(volume)'
+  say indent2 'Optional volume for DISP(NEW)'
+  say indent 'WAIt(seconds)'
+  say indent2 'Seconds to wait for active-job spool updates'
+  say indent 'TRace(Yes or No)'
+  say indent2 'Yes to display diagnostic command and initialization messages'
   say ' '
   say indent2 'Abbreviations in CAPs'
   say ' '

@@ -1,5 +1,6 @@
 # SDSFXDD
 Extract Spool Files to Datasets using SDSF - Generalized
+Version 2.00
 
 ## Overview
 This utility, written in REXX, is intended to be invoked as a batch job step
@@ -28,7 +29,17 @@ either SDSF or EJES.
    LISt(list) +
    OWNer(owner) +
    SYStem(sys) +
-   DATE(date)
+   DATE(date) +
+   UNit(unit) +
+   DIsp(disp) +
+   REPort(yes|no) +
+   OUTstem(stemname) +
+   STORclas(storclas) +
+   MGMTclas(mgmtclas) +
+   DATAclas(dataclas) +
+   VOLume(volume) +
+   WAIt(seconds) +
+   TRace(yes|no)
 ```
 
 Note: Abbreviations are in CAPs.
@@ -38,14 +49,26 @@ Note: Abbreviations are in CAPs.
  | JOB   | Specify the JOB name to be processed.   <br />  jobname(jobid) for a specific job <br />  or  jobname for all jobs with the same jobname <br />  or jobname* for all jobs starting with jobname |
  | STEP | Specify the Stepname to be processed <br /> stepname or * for all steps <br /> ***Note*** that PROC Step names are not considered at this time |
  | PROC | Specify the PROCstep name to be processed <br /> procstep-name or * for all <br /> |
- | DD | Specify the DDname to be processed <br /> ddname or * for all ddnames <br /> masking is not supported at this time |
+ | DD | Specify the DDname to be processed <br /> ddname, `*`, or `?`/`*` masks |
  | OWNER | Specify the owning userid <br /> or default to ALL users |
  | DATE | if non-blank then use JOBID <br> or default to job creation date and time |
  | HLQ | Specify the 1st level qualifier for the generated dataset names <br /> the default  will be the users USERID or PREFIX <br />
  | QUAL | Specify the 2nd level qualifier for the generated dataset names <br /> the 1st qualifier will be the users USERID or PREFIX <br />
  | SUF | Specify the ***optional*** dataset suffix for the generated datasets <br />The default is no suffix or you can specify SUF(NONE) <br /> The suffix is limited to 7 characters |
- | LIST | Defines what the code does when it completes <br /> YES if under ISPF to display a dataset list (ISPF 3.4) of the datasets <br /> NO (default) to just exit |
+ | LIST | Defines what the code does when it completes <br /> YES (default) if under ISPF to display a dataset list (ISPF 3.4) of the datasets <br /> NO to just exit |
  | SYS | Specify if the System generated files (JESMSGLG, JESYSMSG, and JESJCL) are to be included <br /> YES or NO |
+| UNIT | Specify the unit for new output datasets. The default is SYSDA. |
+| DISP | Specify NEW, OLD, SHR, or MOD. The default is NEW. SHR is rejected because it would be inappropriate for extracted output. |
+| REPORT | YES displays matching jobs/DDs and proposed dataset names without allocating or copying. The default is NO. |
+| OUTSTEM | Stores generated/extracted dataset names in a Rexx stem, for example `OUTstem(myout)` creates `myout.0` and `myout.n`. |
+| STORCLAS | Optional SMS storage class for DISP(NEW). |
+| MGMTCLAS | Optional SMS management class for DISP(NEW). |
+| DATACLAS | Optional SMS data class for DISP(NEW). |
+| VOLUME | Optional volume for DISP(NEW). |
+| WAIT | Seconds to wait before extracting an active job; the default retains the one-second JES catch-up delay. |
+| TRACE | YES displays diagnostic command and initialization messages. The default is NO. |
+
+DD, STEP, and PROCSTEP values support `*` and `?` wildcards.
 
  ## Notes:
 
@@ -55,6 +78,7 @@ Note: Abbreviations are in CAPs.
  4. If the job is active and the spool dataset is NOT blocked then messages at the top of the data will provide the user
      with that information so they know that it is possible that some spool data may not have been written to the spool
      and may still be in the spool buffer.
+ 5. The utility returns 0 on success, 4 when no DD entries match, 8 for invalid input, and 16 for allocation or extraction failures.
 
  ## Disclaimer
 
