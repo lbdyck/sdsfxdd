@@ -1,5 +1,5 @@
   /* --------------------  rexx procedure  -------------------- */
-  ver = '1.06'
+  ver = '1.07'
   /*Name:      sdsfxdd                                         |
   |                                                            |
   | Function:  Extract the DD's for a specific Job and Step    |
@@ -17,7 +17,9 @@
   |               LISt(list) +                                 |
   |               OWNer(owner) +                               |
   |               SYStem(sys) +                                |
-  |               DATE(date)                                   |
+  |               DATE(date) +                                 |
+  |               UNit(unit) +                                 |
+  |               DIsp(disp)                                   |
   |                                                            |
   |            Abbreviations in CAPs.                          |
   |                                                            |
@@ -45,6 +47,9 @@
   |              JESMSGLG, JESYSMSG and JESJCL                 |
   |            date - default to use job creation date/time    |
   |                   any character for jobid (e.g. JOBnnnnn)  |
+  |            unit - default to SYSDA, may specify any        |
+  |                   unit type valid for your installation    |
+  |            disp - default to NEW, may be OLD, SHR, or MOD  |
   |                                                            |
   |            *** Qual may be no more than 8 characters       |
   |                and must conform to z/OS dataset naming     |
@@ -52,10 +57,18 @@
   |            *** Suffix may be no more than 7 characters     |
   |                and must conform to z/OS dataset naming     |
   |                                                            |
+  |            *** Unit may be no more than 8 characters       |
+  |                and must be a valid UNIT esoteric symbol    |
+  |                                                            |
+  |            *** Disp must be one of NEW, OLD, SHR, or MOD   |
+  |                No abbreviations are permitted              |
+  |                                                            |
   |  The output datasets will have this prefix:                |
-  |  hlq'.'qual'.D'yyddd'.T'hhmm'.'step'.'dd'.'suffix          |
-  |  or                                                        |
-  |  hlq'.'qual'.'jobid'.T'hhmm'.'step'.'dd'.'suffix           |
+  |                                                            |
+  |  For DATE not specified:                                   |
+  |     hlq'.'qual'.D'yyddd'.T'hhmm'.'step'.'dd'.'suffix       |
+  |  For DATE specified with any value:                        |
+  |     hlq'.'qual'.'jobid'.'step'.'dd'.'suffix                |
   |                                                            |
   | Notes: Because of the limitation of 44 characters for a    |
   |        dataset name it is IMPORTANT that the QUAL and SUF  |
@@ -66,11 +79,22 @@
   |        with a .A, .B, etc. The extension is for uniqueness |
   |        and increments within each duplicate ddname.        |
   |                                                            |
+  |        A maximum of 27 duplicate names can be created.     |
+  |        Extensions are '.A' through '.Z' and then '.$'.     |
+  |        Extensions repeat after 27 so all beyond 27 will    |
+  |        fail for duplicate dataset name.                    |
+  |                                                            |
   | Dependencies:  Address SDSF support is required            |
   |                                                            |
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
+  |    v1.07   2026/11/23 PJF - Add UNIT and DISP parameters   |
+  |                           - Use Qualifier in dataset name  |
+  |                             when DATE argument is used     |
+  |                           - Change some variable names     |
+  |                             that are also reserved words   |
+  |                             like option and value          |
   |    v1.06   2024/06/05 LBD - Add PROCSTEP                   |
   |    v1.05   2024/06/01 LBD - Improve customization for      |
   |                             SDSF/(E)JES                    |
@@ -86,13 +110,14 @@
   |            2021/09/20 LBD - Creation                       |
   |                                                            |
   * ---------------------------------------------------------- *
-  | Copyright (c) 2021-2024 by Lionel B. Dyck under the MIT    |
-  | License                                                    |
+  | Copyright (c) 2021-2026 under the MIT License              |
   | https://mit-license.org                                    |
   * ---------------------------------------------------------- */
-  arg options
+  arg inoptions
 
-  say 'SDSFXDD Version:' ver date() time()
+  parse source . . myname .
+
+  say myname 'Version:' ver date() time()
 
   /* --------------- *
   | Define defaults |
@@ -110,34 +135,38 @@
   /* ---------------------- *
   | Check for help request |
   * ---------------------- */
-  if wordpos('?',options) > 0 then call tutor
+  if wordpos('?',inoptions) > 0 then call tutor
 
   /* -------------------------------- *
   | Determine which keywords we have |
   * -------------------------------- */
   parse value '' with ddname jobname stepname suffix qual list ,
-    owner dopt sys hlq procstep
-  do while options <> ''
-    parse var options option '(' value ')' options
+    owner dopt sys hlq procstep unit disp
+  do while inoptions <> ''
+    parse var inoptions option '(' optval ')' inoptions
     option = strip(option)
-    value = strip(value)
-    if pos('(',value) > 0 then do
-       value = value')'
-       parse value options with ')' options
+    upper option
+    optval = strip(optval)
+    if pos('(',optval) > 0 then do
+       optval = optval')'
+       parse value inoptions with ')' inoptions
        end
+    /* say 'option='option',optval='optval */
     select
-      when abbrev('DDNAME', option, 2)    then ddname   = value
-      when abbrev('JOBNAME', option, 3)   then jobname  = value
-      when abbrev('STEPNAME', option, 4)  then stepname = value
-      when abbrev('PROCSTEP', option, 4)  then procstep = value
-      when abbrev('SUFFIX', option, 3)    then suffix   = value
-      when abbrev('HLQ', option, 3)       then hlq      = value
-      when abbrev('QUALIFIER', option, 4) then qual     = value
-      when abbrev('LIST', option, 3)      then list     = value
-      when abbrev('OWNER', option, 3)     then owner    = value
-      when abbrev('DATE', option, 4)      then dopt     = value
-      when abbrev('SYSTEM', option, 3)    then sys      = value
-      when abbrev('PRODUCT', option, 4)   then prod     = value
+      when abbrev('DDNAME', option, 2)    then ddname   = optval
+      when abbrev('JOBNAME', option, 3)   then jobname  = optval
+      when abbrev('STEPNAME', option, 4)  then stepname = optval
+      when abbrev('PROCSTEP', option, 4)  then procstep = optval
+      when abbrev('SUFFIX', option, 3)    then suffix   = optval
+      when abbrev('HLQ', option, 3)       then hlq      = optval
+      when abbrev('QUALIFIER', option, 4) then qual     = optval
+      when abbrev('LIST', option, 3)      then list     = optval
+      when abbrev('OWNER', option, 3)     then owner    = optval
+      when abbrev('DATE', option, 4)      then dopt     = optval
+      when abbrev('SYSTEM', option, 3)    then sys      = optval
+      when abbrev('PRODUCT', option, 4)   then prod     = optval
+      when abbrev('UNIT', option, 2)      then unit     = optval
+      when abbrev('DISP', option, 2)      then disp     = optval
       otherwise do
         say 'Invalid option "'option'"'
         exit 8
@@ -146,10 +175,39 @@
   end
 
 
+  /* ----------------------------------- *
+  | Validate the QUAL, default to X     |
+  * ----------------------------------- */
   if qual = null then qual = 'X'
   else if length(qual) > 8 then do
     say 'Qualifier must not exceed 8 characters'
     exit 8
+  end
+
+  /* ----------------------------------- *
+  | Validate the UNIT, default to SYSDA |
+  * ----------------------------------- */
+  if unit = null then
+     unit = 'SYSDA'
+  else do
+     upper unit
+     if length(unit) > 8 then do
+        say 'UNIT must not exceed 8 characters'
+        exit 8
+     end
+  end
+
+  /* ----------------------------------- *
+  | Validate the DISP, default to NEW   |
+  * ----------------------------------- */
+  if disp = null then
+     disp = 'NEW'
+  else do
+     upper disp
+     if length(disp) <> 3 | pos(disp, 'NEW OLD MOD SHR') = 0 then do
+        say disp 'is not a valid DISP value'
+        exit 8
+     end
   end
 
   /* --------------------------- *
@@ -188,6 +246,8 @@
   say 'list:     ' list
   say 'date:     ' dopt
   say 'sys:      ' sys
+  say 'unit      ' unit
+  say 'disp      ' disp
 
   if sys = 'NO' then sys = null
 
@@ -289,29 +349,48 @@
         outdsn = "'"sdsfdsn'.'j_stepn.idd'.'j_ddname.idd''suf"'"
 
         do forever
-          if sysdsn(outdsn) = 'OK' then do
-            parse value outdsn with "'"outdsn"'"
-            ext = get_ext(outdsn)
-          end
-          else leave
+           if sysdsn(outdsn) = 'OK' then do
+              if disp = 'NEW' then do
+                 parse value outdsn with "'"outdsn"'"
+                 ext = get_ext(outdsn)
+                 if ext = '!' then do
+                    say ' '
+                    say 'Error. More than 27 duplicate dataset names' ,
+                      'created.'
+                    say ' '
+                    say 'Generated dataset name:' outdsn
+                    if dopt <> null then ,
+                       say 'Suggest not using DATE parameter or using' ,
+                         'unique SUF value for each extraction.'
+                    else ,
+                       say 'Suggest using' ,
+                         'unique SUF value for each extraction.'
+                    say ' '
+                    exit 16
+                 end
+              end
+              else leave
+           end
+           else leave
         end
 
         if length(outdsn) > 46 then do
-          say ' '
-          say 'Error. The generated output dataset name exceeds 44' ,
-            'characters.'
-          say ' '
-          say 'Generated dataset name:' outdsn
-          say 'Suggest reducing the size of the QUAL, the size of the' ,
-            'SUF, or setting SUF to NONE.'
-          say ' '
-          exit 16
+           say ' '
+           say 'Error. The generated output dataset name exceeds 44' ,
+             'characters.'
+           say ' '
+           say 'Generated dataset name:' outdsn
+           say 'Suggest reducing the size of the QUAL, the size of' ,
+             'the SUF, or setting SUF to NONE.'
+           say ' '
+           exit 16
         end
-        say 'sdsfxdd: Extracting:'
-        say '    Step: ' j_stepn.idd
+        say myname': Extracting:'
+        say '    Step:    ' j_stepn.idd
         if procstep /= null then
            say '    ProcStep:' j_procs.idd
         say '    DD:      ' j_ddname.idd
+        say '    DISP:    ' disp
         say '    Dataset: ' outdsn
 
         Address SDSF "ISFACT ST TOKEN('"j_TOKEN.idd"') PARM(NP SA)"
@@ -332,7 +411,7 @@
                 end
 
         blksize = (32760%j_lrecl.idd)*j_lrecl.idd
-        space   = ((j_reccnt.idd*j_lrecl.idd)%56000)+1
+        dspace  = ((j_reccnt.idd*j_lrecl.idd)%56000)+1
 
         recfm = left(j_recfm.idd,1) substr(j_recfm.idd,2,1) ,
           substr(j_recfm.idd,3,1)
@@ -343,10 +422,22 @@
         end
         else recfm = 'V B' substr(j_recfm.idd,3,1)
 
-        'Alloc f('ddn') new blksize('blksize') tracks' ,
-          "ds("outdsn")" ,
-          'space('space','space') lrecl('j_lrecl.idd')' ,
-          'release recfm('recfm')'
+        /* Alloc based on DISP parameter */
+        if disp = 'NEW' then
+           'Alloc f('ddn') new blksize('blksize') tracks' ,
+             "ds("outdsn")" "unit("unit")" ,
+             'space('dspace','dspace') lrecl('j_lrecl.idd')' ,
+             'release recfm('recfm')'
+        else do
+           'Alloc f('ddn')' disp "ds("outdsn")"
+        end
+
+        if RC <> 0 then do
+          say 'Allocation of DSN' outdsn 'failed, correct input' ,
+            'parameters and try again.'
+          say ' '
+          exit 16
+        end
 
         if open_blk.0 > 0 then
             'execio * diskw' ddn '(stem open_blk.'
@@ -402,10 +493,11 @@ Get_Ext: Procedure expose ext duplicates outdsn
   dsn = translate(dsn,' ','.')
   ext = word(dsn,words(dsn))
   if length(ext) = 1 then
-  dsn = subword(dsn,1,words(dsn)-1)
+    dsn = subword(dsn,1,words(dsn)-1)
   str = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ$'
   p = pos(ext,str)
   if p = 0 then ext = 'A'
+  else if p = length(str) then ext = '!' /* This will create invalid DSN */
   else ext = substr(str,p+1,1)
   dsn = translate(dsn,'.',' ')
   outdsn = "'"dsn'.'ext"'"
@@ -444,12 +536,12 @@ get_jobid: procedure
 ptr: return c2d(storage(d2x(arg(1)),4))
 stg: return storage(d2x(arg(1)),arg(2))
 
-Tutor:
+Tutor: Procedure expose myname
   say ' '
   say copies('-',72)
   indent = copies(' ',8)
   indent2 = copies(' ',12)
-  say 'SDSFXDD will extract files from the JES SPOOL',
+  say myname 'will extract files from the JES SPOOL',
     'utilizing SDSF REXX.'
   say ' '
   say 'Syntax:'
@@ -510,6 +602,9 @@ Build_DSN_HLQ:
   /* Suggest using job submission or start time */
   if dopt = null then do
     sdsfdsn = hlq'.'qual'.D'dsn_date'.T'dsn_time
+  end
+  else if qual <> null then do
+    sdsfdsn = hlq'.'qual'.'jobid.ix
   end
   else do
     sdsfdsn = hlq'.'jobid.ix
