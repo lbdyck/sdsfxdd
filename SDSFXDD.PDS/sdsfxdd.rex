@@ -97,7 +97,7 @@
   | Author:    Lionel B. Dyck                                  |
   |                                                            |
   | History:  (most recent on top)                             |
-  |    v2.00   2026/11/23 PJF - Add REPORT, OUTStem, SMS,      |
+  |    v2.00   2026/11/23 LBD - Add REPORT, OUTStem, SMS,      |
   |                             WAIT, and TRACE options        |
   |                           - Add DD/STEP/PROCSTEP masks      |
   |                           - Improve validation and cleanup |
@@ -647,7 +647,7 @@ cleanup_and_exit: Procedure expose prod api_on trace
   end
   exit exit_rc
 
-record_output_dataset: Procedure expose outstem
+record_output_dataset: Procedure expose outstem null
   arg dsn
   if outstem = null then return
   dsn = strip(dsn)
@@ -658,7 +658,7 @@ record_output_dataset: Procedure expose outstem
   interpret outstem'.'count'="'dsn'"'
   return
 
-validate_target_dataset: Procedure expose trace prod api_on
+validate_target_dataset: Procedure expose trace prod api_on null
   arg dsn, disp_name, source_recfm, source_lrecl
   dsn_plain = strip(dsn)
   if left(dsn_plain,1) = "'" & right(dsn_plain,1) = "'" then
@@ -744,7 +744,7 @@ get_jobid: procedure
 ptr: return c2d(storage(d2x(arg(1)),4))
 stg: return storage(d2x(arg(1)),arg(2))
 
-match_mask: Procedure
+match_mask: Procedure expose null
   arg value, mask
   value = translate(strip(value))
   mask = translate(strip(mask))
@@ -762,7 +762,7 @@ match_mask: Procedure
     return match_mask(substr(value,2),substr(mask,2))
   return 0
 
-validate_dsn_component: Procedure
+validate_dsn_component: Procedure expose null
   arg component
   component = strip(component)
   if component = null | length(component) > 8 then return 0
@@ -774,7 +774,7 @@ validate_dsn_component: Procedure
   end
   return 1
 
-validate_dsn_name: Procedure
+validate_dsn_name: Procedure expose null
   arg dsn
   dsn = strip(dsn)
   if dsn = null | length(dsn) > 44 then return 0
@@ -784,7 +784,7 @@ validate_dsn_name: Procedure
   end
   return 1
 
-validate_rexx_symbol: Procedure
+validate_rexx_symbol: Procedure expose null
   arg symbol
   symbol = strip(symbol)
   if symbol = null then return 0
